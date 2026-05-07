@@ -1,0 +1,14 @@
+/*
+ * Re-export the design-token stylesheet from @super-meshine/ui.
+ *
+ * Tailwind 4 picks up tokens from the `@theme` block defined there; keeping
+ * the source of truth in `packages/ui` means future apps (admin, mobile-web)
+ * inherit the same palette without copy-paste.
+ *
+ * `@source` directives extend Tailwind 4's content scan to workspace
+ * packages. Without them, utilities used inside `@super-meshine/ui`
+ * components (e.g. `bg-primary` on the Button) get tree-shaken away.
+ */
+@import "@super-meshine/ui/styles/globals.css";
+
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
