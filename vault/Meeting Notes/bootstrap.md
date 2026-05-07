@@ -6,7 +6,7 @@
 
 ## Open Questions
 
-- בחירת וורטיקל סופית (ההמלצה: contract manufacturing במזון/קוסמטיקה — תלוי בשיחות גילוי).
+- בחירת וורטיקל סופית (ההמלצה: contract manufacturing במזון/קוסמטיקה — תלוי במחקר vertical-researcher + שיחות גילוי).
 - TS או Python בבקאנד?
 - Cloud-only ב-MVP או on-prem option מההתחלה?
 
@@ -26,3 +26,16 @@
   - תוכנית מלאה ב-`C:\Users\ronen\.claude\plans\lively-juggling-starlight.md`.
   - הצעדים הבאים: CLAUDE.md → architect agent → discovery interviews במקביל.
 - **Related:** [[architect-agent]] (יווצר בקרוב)
+
+### 2026-05-07 — Add vertical-researcher agent [active]
+- **What was done:**
+  - יצירת `.claude/agents/vertical-researcher.md` — סוכן מחקר וורטיקלים בדפוס chen מ-the-five-aegents.
+  - Tools: Read/Write/Glob/Grep/WebSearch/WebFetch. Model: sonnet.
+  - 7 שלבי workflow, פלט ל-`vault/Discovery/<YYYY-MM-DD>-<slug>.md` בתבנית קבועה.
+- **Decisions:**
+  - הסוכן לא מחליף שיחות גילוי — הוא מצמצם אותן ומעמיק אותן. כל דוח חייב להסתיים ב≥15 חברות לפנייה (חוק ברזל #1).
+  - Hard rule מפורש: הסוכן לא בוחר וורטיקל ולא כותב המלצה אסטרטגית. רק עובדות + טבלה מאוזנת. ההחלטה ב-CEO.
+  - Anti-pattern מתועד: רשימה גנרית מ-b144 = רעש; 15 חברות מסוננות לפי קריטריון = ערך.
+- **Notes / Caveats:**
+  - הצעד הבא: להפעיל את הסוכן עם brief ראשון — מיפוי 3-5 וורטיקלים מועמדים בישראל (מזון, קוסמטיקה, אלקטרוניקה, מתכת, contract manufacturing כללי).
+- **Related:** [[vertical-researcher]]
