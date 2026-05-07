@@ -42,13 +42,69 @@
 3. **Agent action = transaction עם human-approval gate מעל threshold.** כל פעולה של Process Agent (רכש, שינוי הזמנה, מחיקה) רצה בתוך transaction, וכל פעולה מעל threshold שמוגדר ב-policy עוצרת ל-approval לפני commit.
 4. **Schema migrations עם rollback obligatorio.** כל migration חייבת up + down, וכל שינוי schema ש-Customization Agent מבצע נבדק ב-staging לפני production.
 
-## Subagent Dispatch — האילוץ הקריטי
+## Org Structure — היררכיית סוכנים
 
-סאב-אייג'נטים ב-Claude Code **לא מפעילים סאב-אייג'נטים אחרים**. כל ה-orchestration עובר דרך ה-CEO (Claude הראשי). תכנן הגדרות סוכנים לפי זה:
+הפרויקט מאורגן ב-4 מחלקות, כל אחת עם מנהל. ה-CEO (Claude הראשי, ה-session הזה) מתאם בין המחלקות. המייסד (אתה) מדבר עם ה-CEO; ה-CEO מדבר עם המנהלים; המנהלים מתכננים ומאשרים את עבודת ה-workers.
 
-- כל סוכן הוא flat — מקבל context, מבצע משימה אחת, מחזיר דוח.
-- לולאות review (implementer → spec-reviewer → code-quality-reviewer) מנוהלות ע"י ה-CEO באמצעות `subagent-driven-development`.
-- אסור לסוכן לקרוא ל-Task tool מתוך עצמו.
+```
+Ronen (User)
+   ↓ chat
+CEO (Main Claude session — אני)
+   ↓ Task dispatch
+   ├── Architecture Department
+   │      Manager: architect (player-manager — מחלקה של אחד)
+   │
+   ├── Research Department
+   │      Manager: vertical-researcher (player-manager — מחלקה של אחד)
+   │
+   ├── Engineering Department
+   │      Manager: engineering-manager
+   │      Workers: backend-builder, frontend-builder
+   │
+   └── QA & Compliance Department
+          Manager: qa-manager
+          Workers: spec-reviewer, code-quality-reviewer, erp-domain-expert
+```
+
+PRD לכל מחלקה: `vault/Departments/<dept>.md`.
+
+### Subagent Dispatch — האילוץ הקריטי
+
+סאב-אייג'נטים ב-Claude Code **לא מפעילים סאב-אייג'נטים אחרים**. כל ה-Task dispatching עובר דרך ה-CEO. זה משנה את התפקיד של "מנהל מחלקה":
+
+- **המנהל הוא planner + reviewer + decision-maker**, **לא** dispatcher.
+- מנהל מקבל משימה ברמת מחלקה, מחזיר work plan עם תתי-משימות לעובדים.
+- ה-CEO מדספץ' את העובדים בפועל לפי התוכנית.
+- העובדים חוזרים ל-CEO; ה-CEO מעביר את התוצרים למנהל ל-acceptance review.
+- מנהל מאשר ✅ / דוחה ❌ / מסליו ⚠️ ל-architect או CEO.
+
+### Decision authority — מה מנהל יכול להחליט בעצמו
+
+| המחלקה | החלטות עצמאיות |
+|---|---|
+| architect | ADRs, schema design, multi-tenant safety, API contracts |
+| vertical-researcher | מתודולוגיית מחקר, מקורות, רשימת חברות |
+| engineering-manager | חלוקת עבודה backend/frontend, מבנה תיקיות, סדר ביצוע, האם 🟡 חוסם |
+| qa-manager | אילו reviewers בשרשרת, האם erp-domain-expert נדרש, הכרעת קונפליקט בין reviewers |
+
+### Escalation — מתי מנהל פונה למעלה
+
+| המנהל | פונה ל-architect | פונה ל-CEO/User |
+|---|---|---|
+| engineering-manager | schema cross-module, dependency חדש, security model change | scope change, החלטה עסקית, ADR contradiction |
+| qa-manager | ⚠️ שמסתעף מ-ADR פגום | scope של spec עצמו פגום |
+| architect | (איננו פונה לארכיטקט אחר) | החלטה עסקית, אישור ADR ל-Accepted |
+| vertical-researcher | (לא רלוונטי) | בחירת וורטיקל סופית |
+
+### זרימת העבודה — 5 שלבים
+
+1. **Routing:** ה-CEO מקבל משימה מהמייסד, בוחר את המנהל הרלוונטי לפי הסוג (cross-module → architect; implementation → engineering-manager; review → qa-manager; research → vertical-researcher).
+2. **Planning:** ה-CEO מדספץ' את המנהל. המנהל מחזיר work plan ב-`vault/<Dept>/`.
+3. **Execution:** ה-CEO מדספץ' את ה-workers לפי התוכנית (במקביל אם independent — ראה skill `dispatching-parallel-agents`).
+4. **Review:** ה-CEO מדספץ' את qa-manager שמתכנן את שרשרת ה-reviewers (spec → quality → optionally domain). ה-CEO מריץ את השרשרת.
+5. **Acceptance:** ה-CEO מעביר את כל התוצרים למנהל הבעלים לאישור סופי. מנהל מאשר → ה-CEO מדווח למייסד.
+
+הפרוטוקול המלא בskill `manager-delegation-pattern`.
 
 ## Definition of Done — סבב עבודה
 
