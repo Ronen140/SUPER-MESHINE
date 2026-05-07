@@ -15,6 +15,31 @@
 
 ## Session Log
 
+### 2026-05-07 — Founder firsthand experience [done]
+
+- **What was done:**
+  - Founder shared firsthand work experience from 3 Israeli manufacturers: Inbar Metalworking (~20 emp, Kitron), Amtan Karmiel (~100 emp, weapons), Sanmina Karmiel (~800 emp, Oracle).
+  - Captured in `vault/Discovery/2026-05-07-founder-firsthand-experience.md`.
+- **Key findings (override desk research where they conflict):**
+  - **3-of-3 plants:** ERP exists but is bypassed — daily work happens in Excel/Sheets layer above it.
+  - **3-of-3 plants:** Shop floor reporting is broken or absent.
+  - **2-of-3 plants:** Customization is locked behind expensive implementers.
+  - **Visual item identification** (Amtan: hundreds of items differing by raw material, looking identical) is a textbook AI-native use case for Document Intelligence + computer vision.
+- **Strategic pivot surfaced:**
+  - Path A — replace the ERP (original plan, longer sales cycle).
+  - Path B — sit on top of the existing ERP, replace the Excel layer (faster, wider TAM, lower margins).
+  - **Decision:** Validate Path B vs Path A in the next 5 discovery calls. Specific question to ask: "If a tool plugged into Priority/Oracle and replaced 80% of your Excel work, what would you pay per month?"
+- **ICP refined:**
+  - Size band: **50-200 employees** (not 20, not 800).
+  - Current ERP spend: **₪80K-₪250K/year** (already paying = has budget).
+  - Decision-maker: COO/VP Ops/CFO (NOT chaotic owner, NOT IT manager).
+  - Pain signal: "We export to Excel to actually work."
+  - Anti-patterns documented: minimalist 20-emp shops, "cheap" CEOs with shifting decisions, 500+ on Oracle/SAP.
+- **Notes / Caveats:**
+  - The discovery report's company list (85 companies) needs re-scoring against the refined ICP. Some companies will drop (e.g. those known to be 20-30 emp), others rise.
+  - Strategic plan `lively-juggling-starlight.md` should be updated with the Path A/B fork.
+- **Related:** [[founder-firsthand-experience]] (in Discovery folder), [[bootstrap]], [[founding-decisions]]
+
 ### 2026-05-07 — Vertical research v1 [done]
 
 - **What was done:**
