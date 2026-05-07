@@ -9,6 +9,7 @@ See `.claude/skills/obsidian-vault-workflow/SKILL.md` for the full read/write pr
 | Topic | File | Status | Last touched |
 |---|---|---|---|
 | Project bootstrap | [[bootstrap]] | active | 2026-05-07 |
+| Founding decisions (stack, hosting, agent scope) | [[founding-decisions]] | done | 2026-05-07 |
 
 ## Folders
 
