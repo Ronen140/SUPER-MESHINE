@@ -10,7 +10,8 @@
       "drizzle",
       "**/*.generated.ts",
       "vault",
-      ".claude"
+      ".claude",
+      ".obsidian"
     ]
   }
 }
