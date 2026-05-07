@@ -1,0 +1,16 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "extends": ["./packages/config/biome.base.json"],
+  "files": {
+    "ignore": [
+      "node_modules",
+      "dist",
+      ".next",
+      ".turbo",
+      "drizzle",
+      "**/*.generated.ts",
+      "vault",
+      ".claude"
+    ]
+  }
+}
