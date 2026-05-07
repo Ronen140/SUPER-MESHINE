@@ -16,10 +16,7 @@ describe('mcp server', () => {
     const server = createMcpServer();
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
-    const client = new Client(
-      { name: 'test-client', version: '0.0.0' },
-      { capabilities: {} },
-    );
+    const client = new Client({ name: 'test-client', version: '0.0.0' }, { capabilities: {} });
 
     await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 

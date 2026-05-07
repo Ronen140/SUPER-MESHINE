@@ -8,9 +8,5 @@
     "./biome.base.json": "./biome.base.json",
     "./eslint.base.cjs": "./eslint.base.cjs"
   },
-  "files": [
-    "tsconfig.base.json",
-    "biome.base.json",
-    "eslint.base.cjs"
-  ]
+  "files": ["tsconfig.base.json", "biome.base.json", "eslint.base.cjs"]
 }
