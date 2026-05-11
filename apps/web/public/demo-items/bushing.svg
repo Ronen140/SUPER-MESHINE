@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <linearGradient id="bronzeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a8743b"/>
+      <stop offset="50%" stop-color="#cd9866"/>
+      <stop offset="100%" stop-color="#7a5527"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="#2a2a2a"/>
+  <rect y="230" width="400" height="70" fill="#3a3a3a"/>
+  <ellipse cx="200" cy="235" rx="90" ry="5" fill="#000" opacity="0.5"/>
+  <!-- bushing outer cylinder -->
+  <rect x="120" y="140" width="160" height="100" fill="url(#bronzeGrad)" stroke="#5a3f1d" stroke-width="1"/>
+  <!-- left/right ovals for 3D -->
+  <ellipse cx="120" cy="190" rx="6" ry="50" fill="#cd9866"/>
+  <ellipse cx="280" cy="190" rx="6" ry="50" fill="#7a5527"/>
+  <!-- inner bore (left side visible) -->
+  <ellipse cx="120" cy="190" rx="3" ry="32" fill="#1a1a1a"/>
+  <!-- highlight -->
+  <rect x="130" y="145" width="3" height="90" fill="#fff" opacity="0.5"/>
+  <text x="200" y="280" text-anchor="middle" font-family="monospace" font-size="12" fill="#888">Bushing 12 ID × 16 OD × 20 — sintered bronze</text>
+</svg>

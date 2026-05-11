@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <linearGradient id="brassGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d4af37"/>
+      <stop offset="50%" stop-color="#f7d97c"/>
+      <stop offset="100%" stop-color="#a07d20"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="#2a2a2a"/>
+  <rect y="240" width="400" height="60" fill="#3a3a3a"/>
+  <ellipse cx="200" cy="245" rx="80" ry="5" fill="#000" opacity="0.5"/>
+  <!-- hex nut shape -->
+  <polygon points="200,120 270,160 270,220 200,260 130,220 130,160" fill="url(#brassGrad)" stroke="#7a5e15" stroke-width="2"/>
+  <!-- center hole -->
+  <circle cx="200" cy="190" r="22" fill="#1a1a1a"/>
+  <circle cx="200" cy="190" r="22" fill="none" stroke="#7a5e15" stroke-width="1.5"/>
+  <!-- highlight -->
+  <polygon points="200,120 270,160 240,170 200,135" fill="#fff" opacity="0.25"/>
+  <text x="200" y="285" text-anchor="middle" font-family="monospace" font-size="12" fill="#888">M10 hex nut — brass C360</text>
+</svg>

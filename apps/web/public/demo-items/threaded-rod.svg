@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <linearGradient id="rodMetal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c0c0c0"/>
+      <stop offset="50%" stop-color="#e8e8e8"/>
+      <stop offset="100%" stop-color="#909090"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="#2a2a2a"/>
+  <rect y="220" width="400" height="80" fill="#3a3a3a"/>
+  <line x1="0" y1="220" x2="400" y2="220" stroke="#1a1a1a" stroke-width="2"/>
+  <ellipse cx="200" cy="225" rx="160" ry="5" fill="#000" opacity="0.4"/>
+  <!-- rod body -->
+  <rect x="40" y="200" width="320" height="20" fill="url(#rodMetal)"/>
+  <!-- thread pattern (diagonal stripes simulating threads) -->
+  <g stroke="#555" stroke-width="1.2">
+    <line x1="40" y1="200" x2="48" y2="220"/>
+    <line x1="50" y1="200" x2="58" y2="220"/>
+    <line x1="60" y1="200" x2="68" y2="220"/>
+    <line x1="70" y1="200" x2="78" y2="220"/>
+    <line x1="80" y1="200" x2="88" y2="220"/>
+    <line x1="90" y1="200" x2="98" y2="220"/>
+    <line x1="100" y1="200" x2="108" y2="220"/>
+    <line x1="110" y1="200" x2="118" y2="220"/>
+    <line x1="120" y1="200" x2="128" y2="220"/>
+    <line x1="130" y1="200" x2="138" y2="220"/>
+    <line x1="140" y1="200" x2="148" y2="220"/>
+    <line x1="150" y1="200" x2="158" y2="220"/>
+    <line x1="160" y1="200" x2="168" y2="220"/>
+    <line x1="170" y1="200" x2="178" y2="220"/>
+    <line x1="180" y1="200" x2="188" y2="220"/>
+    <line x1="190" y1="200" x2="198" y2="220"/>
+    <line x1="200" y1="200" x2="208" y2="220"/>
+    <line x1="210" y1="200" x2="218" y2="220"/>
+    <line x1="220" y1="200" x2="228" y2="220"/>
+    <line x1="230" y1="200" x2="238" y2="220"/>
+    <line x1="240" y1="200" x2="248" y2="220"/>
+    <line x1="250" y1="200" x2="258" y2="220"/>
+    <line x1="260" y1="200" x2="268" y2="220"/>
+    <line x1="270" y1="200" x2="278" y2="220"/>
+    <line x1="280" y1="200" x2="288" y2="220"/>
+    <line x1="290" y1="200" x2="298" y2="220"/>
+    <line x1="300" y1="200" x2="308" y2="220"/>
+    <line x1="310" y1="200" x2="318" y2="220"/>
+    <line x1="320" y1="200" x2="328" y2="220"/>
+    <line x1="330" y1="200" x2="338" y2="220"/>
+    <line x1="340" y1="200" x2="348" y2="220"/>
+    <line x1="350" y1="200" x2="358" y2="220"/>
+  </g>
+  <text x="200" y="280" text-anchor="middle" font-family="monospace" font-size="12" fill="#888">M8 × 100mm threaded rod</text>
+</svg>

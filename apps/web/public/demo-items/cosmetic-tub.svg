@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <linearGradient id="tubGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d4d4d4"/>
+      <stop offset="50%" stop-color="#fafafa"/>
+      <stop offset="100%" stop-color="#bcbcbc"/>
+    </linearGradient>
+    <linearGradient id="lidGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c8c8c8"/>
+      <stop offset="50%" stop-color="#f0f0f0"/>
+      <stop offset="100%" stop-color="#a4a4a4"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="#1f2937"/>
+  <!-- shelf surface -->
+  <rect y="230" width="400" height="70" fill="#374151"/>
+  <line x1="0" y1="230" x2="400" y2="230" stroke="#111827" stroke-width="2"/>
+  <!-- shadow -->
+  <ellipse cx="200" cy="232" rx="80" ry="5" fill="#000" opacity="0.5"/>
+  <!-- tub body -->
+  <rect x="135" y="130" width="130" height="100" fill="url(#tubGrad)" stroke="#888" stroke-width="0.5" rx="4"/>
+  <!-- tub bottom curve -->
+  <ellipse cx="200" cy="230" rx="65" ry="6" fill="#bcbcbc"/>
+  <!-- lid -->
+  <rect x="130" y="115" width="140" height="20" fill="url(#lidGrad)" rx="3"/>
+  <ellipse cx="200" cy="115" rx="70" ry="5" fill="#e0e0e0"/>
+  <!-- subtle highlight -->
+  <rect x="145" y="135" width="3" height="80" fill="#fff" opacity="0.5"/>
+  <!-- "no label" indicator -->
+  <text x="200" y="180" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#666" font-style="italic">[unlabeled]</text>
+  <!-- shelf label hint -->
+  <text x="200" y="285" text-anchor="middle" font-family="monospace" font-size="12" fill="#9ca3af">Cold storage / Rack 12</text>
+</svg>
