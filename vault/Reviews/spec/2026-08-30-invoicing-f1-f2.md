@@ -50,3 +50,27 @@
 המימוש מכסה נכון את רוב הדרישות המהותיות של F1-F2: RTL תקין (`dir="rtl" lang="he"`, logical properties בלבד, ללא הפרות פיזיות), שפת העיצוב (stone+emerald primary יחיד, פונט Assistant+fallbacks, tabular-nums) יושמה מדויק לפי מסמך המחקר, ה-Supabase clients הם anon-בלבד ותואמים את ADR-INV-001 §D5 (אין import של service-role/service_role key), ושתי החריגות שה-builder סימן (primitives ידניים, קריאה ישירה ל-Supabase Auth בלי tRPC) מתועדות ומאומתות מול ה-plan בפועל. עם זאת, שני AC מפורשים מ-F1 לא מולאו: אין טסט ישיר ל-client factories (`browser.ts`/`server.ts`), והאימות שבוצע הוא curl+jsdom ולא "ווידוא דפדפן" אמיתי כפי שנדרש. בנוסף נמצאה חריגת scope קלה — קישורי ניווט ב-sidebar למסכי Phase 1 (`/documents`, `/customers`) שלא נכללו ב-F1 spec ומנוגדים במפורש להכרעת הגבול Phase 0/1 בתוכנית העבודה.
 
 ---
+
+# Round 2 — Re-review of 3 fixes (commit b8602d3)
+
+**תאריך:** 2026-08-30 (זמן כתיבה, סבב 2)
+**Commits:** b8602d3
+**Scope:** בדיקה ממוקדת של שלושת ה-Missing/Extra items מסבב 1 בלבד — לא re-review מלא של F1-F2.
+
+## תוצאה (סבב 2, ממוקד): ✅ שלושת הפערים נסגרו
+
+| # | פער מסבב 1 | סטטוס | עדות |
+|---|---|---|---|
+| 1 | client factories מכוסים בבדיקות | ✅ נסגר | `invoicing-receipts/src/lib/supabase/browser.test.ts` (חדש) — מריץ את `createClient()` האמיתי (import ישיר, לא mock): בודק `throw` על `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` חסרים וגם מקרה הצלחה (`client.auth.signInWithPassword`, `client.from` קיימים). `invoicing-receipts/src/lib/supabase/server.test.ts` (חדש) — מוקם רק `next/headers` (Next runtime API, לא הקוד שלנו), מריץ את `createClient()` האמיתי כולל שני נתיבי ה-`throw`, ומאמת שה-cookie adapter האמיתי נקרא בפועל (`getAllMock` נקרא דרך `client.auth.getSession()`). זו כיסוי אמיתי של הקוד, לא רק mock. |
+| 2 | ווידוא דפדפן | ✅ נסגר | 7 screenshots ב-scratchpad, נבדקו 3: `login-validation-errors.png` — RTL מלא (לייבלים וטקסט מיושרים לימין, כיוון קריאה נכון), הודעות שגיאה בעברית ("נא להזין כתובת אימייל תקינה.", "יש להזין סיסמה.") בגבול אדום; `signup-mismatch-error.png` — טופס הרשמה מלא ב-RTL, "הסיסמאות אינן תואמות." מוצג נכון; `root-redirected-to-login.png` — ניווט מ-`/` (לא מחובר) הגיע בפועל למסך login מרונדר ב-Chromium אמיתי (RTL, פונט, טוקני עיצוב stone+emerald נראים תואמים ל-globals.css). זהו אימות Chromium headless אמיתי (Playwright), לא רק curl/jsdom כפי שהיה בסבב 1. |
+| 3 | Sidebar — "מסמכים"/"לקוחות" ל-Phase 1 | ✅ נסגר | `invoicing-receipts/src/components/layout/sidebar.tsx` — פוצל ל-`ACTIVE_NAV_ITEMS` (רק "בית", `<Link href="/">`) ו-`UPCOMING_NAV_ITEMS` ("מסמכים"/"לקוחות" — `<span aria-disabled="true">` עם badge "בקרוב", **ללא** `href`/`<Link>`). `invoicing-receipts/src/components/layout/sidebar.test.tsx` (חדש) מוודא במפורש: `queryByRole("link", { name: /מסמכים/ })`/`/לקוחות/` אינם קיימים ב-DOM כ-link, וטקסט "בקרוב" מופיע פעמיים. |
+
+## Extra items (סבב 2 — נבדק, לא נמצא חדש)
+
+בדיקת ה-diff המלא של `b8602d3` (`package.json`, `errors.ts`/`errors.test.ts`) — אין תוספת scope חדשה: `playwright` נוסף כ-devDependency (תואם את הצורך באימות דפדפן, לא שימוש-יתר); השינויים ב-`errors.ts`/`errors.test.ts` הם עיצוב/פורמט בלבד (biome quoting/line-wrap) על קובץ קיים של backend-builder, לא שינוי פונקציונלי ולא בסקופ F1/F2.
+
+## הערכה כללית (סבב 2)
+
+שלושת הפערים שזוהו בסבב 1 נסגרו במלואם ובאופן שממש עונה על רוח ה-AC המקורי (בדיקות שמריצות קוד אמיתי, לא mock; דפדפן headless אמיתי, לא curl/jsdom; sidebar שאין בו קישורים אמיתיים ל-Phase 1). לא נמצאה חריגת scope חדשה בתיקון עצמו. **מסקנה: F1-F2 כעת ✅ Spec compliant** (בכפוף לכך שזהו re-review ממוקד בשלושת הפריטים בלבד ולא ביקורת חוזרת מלאה של כל ה-checklist המקורי מסבב 1 — שאר 22 השורות שם כבר היו ✅ ולא שונו בקומיט הזה).
+
+---
