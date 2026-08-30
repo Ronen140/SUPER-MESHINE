@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type TestDb, runSql } from "./harness";
+import { runSql, type TestDb } from "./harness";
 
 export interface SeededBusiness {
   ownerId: string;
@@ -9,9 +9,13 @@ export interface SeededBusiness {
 
 /**
  * Seeds one owner + one business + one membership + one customer + one (dummy) active
- * signing key, using the admin/superuser connection (no RLS — this is fixture setup, not the
- * behavior under test). Every test file composes its own scenario on top of this with
- * `runSql(db, ..., { userId })`.
+ * signing key, using the `db_owner` connection with no role impersonation (RLS-exempt here
+ * only because `db_owner` — a real non-superuser, unlike a bootstrap Postgres superuser —
+ * *owns* every table it seeds, and none of them carry `FORCE`; this is fixture setup, not the
+ * behavior under test). `business_signing_keys` is the one exception in this project's own
+ * schema (ADR-INV-001 §D3.2 — `FORCE`, zero policies, `service_role`-only), so that one insert
+ * runs `as service_role` instead. Every test file composes its own scenario on top of this
+ * with `runSql(db, ..., { userId })`.
  */
 export async function seedBusiness(
   db: TestDb,
@@ -36,7 +40,14 @@ export async function seedBusiness(
 
     insert into public.customers (id, business_id, name)
     values ('${customerId}', '${businessId}', 'Test Customer');
+    `,
+  );
 
+  // ADR-INV-001 §D3.2: business_signing_keys has FORCE + zero policies — only service_role
+  // (BYPASSRLS) can ever write to it, table owner included.
+  await runSql(
+    db,
+    `
     insert into public.business_signing_keys (
       business_id, certificate_pem, certificate_serial, subject_dn, fingerprint_sha256,
       not_before, not_after, private_key_ciphertext, private_key_nonce, wrapped_dek, kek_id
@@ -45,6 +56,7 @@ export async function seedBusiness(
       '\\xdead', '\\xdead', '\\xdead', 'v1'
     );
     `,
+    { role: "service_role" },
   );
 
   return { ownerId, businessId, customerId };

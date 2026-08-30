@@ -1,0 +1,10 @@
+# Python dependencies for api/*.py (Vercel Python serverless functions — a separate runtime
+# from the Next.js/Node app; not part of package.json/pnpm).
+#
+# cryptography: RSA-3072 keypair generation, X.509 self-issued certificate construction, and
+# AES-256-GCM envelope encryption for api/keygen.py (ADR-INV-003 §D4). There is no Python
+# stdlib substitute for any of these — flagged here for visibility per this project's
+# no-new-dependencies-without-approval rule, since ADR-INV-003 itself mandates exactly these
+# primitives (RSA/X.509/AES-GCM) and `cryptography` is the standard, de facto-only library
+# that provides them.
+cryptography>=41,<51

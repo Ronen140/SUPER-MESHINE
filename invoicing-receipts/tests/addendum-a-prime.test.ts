@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMatchingPayment, seedBusiness, seedDraftReceipt, type SeededBusiness } from "./db/fixtures";
+import {
+  addMatchingPayment,
+  type SeededBusiness,
+  seedBusiness,
+  seedDraftReceipt,
+} from "./db/fixtures";
 import { createTestDb, dropTestDb, runSql, type TestDb } from "./db/harness";
 
 /**
@@ -32,7 +37,9 @@ describe("ADR-INV-002 Addendum A′ — issue_date / draft VAT rate", () => {
     const documentId = await seedDraftReceipt(db, biz, { issueDate: "2024-11-15", unitPrice: 100 });
     await addMatchingPayment(db, biz, documentId, 117, "2024-11-15");
 
-    await runSql(db, `select public.issue_document('${documentId}', null);`, { userId: biz.ownerId });
+    await runSql(db, `select public.issue_document('${documentId}', null);`, {
+      userId: biz.ownerId,
+    });
 
     const out = await runSql(
       db,
@@ -50,7 +57,9 @@ describe("ADR-INV-002 Addendum A′ — issue_date / draft VAT rate", () => {
     const documentId = await seedDraftReceipt(db, biz, { issueDate: "2024-06-01", unitPrice: 100 });
     await addMatchingPayment(db, biz, documentId, 118, "2025-03-01");
 
-    await runSql(db, `select public.issue_document('${documentId}', '2025-03-01');`, { userId: biz.ownerId });
+    await runSql(db, `select public.issue_document('${documentId}', '2025-03-01');`, {
+      userId: biz.ownerId,
+    });
 
     const out = await runSql(
       db,

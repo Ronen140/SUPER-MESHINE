@@ -241,7 +241,7 @@ grant  execute on function public.issue_document(uuid, date) to authenticated;
 
 -- ----------------------------------------------------------------------------
 -- Restore app.document_lines_compute() to 0009_amendments.sql's version ("today's rate"
--- unconditionally, no v_issue_date lookup).
+-- unconditionally, no v_issue_date lookup, calling app.compute_line() — restored below).
 -- ----------------------------------------------------------------------------
 
 create or replace function app.document_lines_compute()
@@ -290,6 +290,23 @@ begin
   return new;
 end;
 $$;
+
+-- ----------------------------------------------------------------------------
+-- Move public.compute_line() back to app.compute_line(), undoing this migration's fix for
+-- the "SECURITY INVOKER trigger cannot resolve app.compute_line() for a real authenticated
+-- client" bug. `grant execute ... to public` restores the original (pre-migration) implicit
+-- PUBLIC-default-grant-equivalent ACL state exactly, rather than leaving a dangling explicit
+-- per-role grant behind after the schema move.
+-- ----------------------------------------------------------------------------
+
+revoke execute on function public.compute_line(numeric, numeric, numeric, public.vat_treatment, numeric)
+  from authenticated;
+
+alter function public.compute_line(numeric, numeric, numeric, public.vat_treatment, numeric)
+  set schema app;
+
+grant execute on function app.compute_line(numeric, numeric, numeric, public.vat_treatment, numeric)
+  to public;
 
 -- ----------------------------------------------------------------------------
 -- Restore app.recompute_draft_lines() to 0009_amendments.sql's version (unqualified

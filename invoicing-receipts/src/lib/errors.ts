@@ -61,6 +61,13 @@ export const INV_ERROR_MESSAGES: Record<string, string> = {
   // dated after the moment it is actually issued.
   INV_FUTURE_ISSUE_DATE: "לא ניתן להפיק מסמך עם תאריך הפקה עתידי.",
 
+  // public.create_business() (0011_create_business.sql, ADR-INV-001 §D10, B9)
+  INV_UNAUTHENTICATED: "יש להתחבר כדי לבצע פעולה זו.",
+  INV_NO_PROFILE: "לא נמצא פרופיל משתמש. נסו להתנתק ולהתחבר מחדש.",
+  INV_BUSINESS_LIMIT: "לא ניתן ליצור יותר מ-10 עסקים למשתמש אחד.",
+  INV_BAD_TAX_ID: "מספר עוסק/ח.פ אינו תקין — נדרשות 9 ספרות.",
+  INV_TAX_ID_EXISTS: "כבר קיים עסק עם מספר עוסק/ח.פ זה במערכת.",
+
   // app.set_start_number() (0008_issue_function.sql, ADR-INV-001 Implementation Notes #7)
   INV_NOT_OWNER: "רק בעלים של העסק רשאי לקבוע את מספר ההתחלה של סדרת המספור.",
   INV_COUNTER_ALREADY_STARTED: "כבר הופק מסמך בסדרה זו — לא ניתן לשנות את מספר ההתחלה.",

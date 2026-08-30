@@ -25,13 +25,33 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const ADMIN_URL = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/postgres";
+const ADMIN_URL =
+  process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/postgres";
 
 const MIGRATIONS_DIR = path.resolve(import.meta.dirname, "../../supabase/migrations");
 const AUTH_STUB_PATH = path.resolve(import.meta.dirname, "auth-stub.sql");
+const STORAGE_STUB_PATH = path.resolve(import.meta.dirname, "storage-stub.sql");
 
-function urlForDb(name: string): string {
+/**
+ * The bootstrap `postgres` role in both a local `postgres:16` install and the official
+ * `postgres:16` Docker image (used by CI's services container, B13) is an actual Postgres
+ * *superuser* — `rolsuper = true`. A superuser bypasses RLS unconditionally, `FORCE` or not
+ * (verified empirically: the `business_signing_keys` FORCE canary in `tests/isolation.test.ts`
+ * only fails when the table owner is a non-superuser — exactly Supabase's real `postgres`
+ * project role, which is documented to be a powerful-but-non-superuser role for precisely
+ * this reason, matching ADR-INV-001 Amendment A-4's own stated assumption). Running every
+ * migration as the bootstrap superuser would make every `FORCE`-dependent test pass
+ * regardless of whether `FORCE` is actually present — a false negative baked into the test
+ * environment itself, not the schema. `db_owner` (created once per test database, never
+ * superuser) owns every object every migration creates, faithfully reproducing that gap.
+ */
+const OWNER_ROLE = "db_owner";
+const OWNER_PASSWORD = "db_owner";
+
+function urlForDb(name: string, role?: string, password?: string): string {
   const u = new URL(ADMIN_URL);
+  if (role) u.username = role;
+  if (password) u.password = password;
   u.pathname = `/${name}`;
   return u.toString();
 }
@@ -69,11 +89,55 @@ export interface TestDb {
  * in `supabase/migrations/` (in filename order — 0001, 0002, ... 0010, ...) exactly as CI's
  * down/up roundtrip and the real Supabase project do.
  */
+/** Extensions 0001_extensions.sql installs. Not all are `trusted` (moddatetime isn't) —
+ * pre-installed by the superuser admin connection below, once per test database, exactly as
+ * the real Supabase platform pre-installs extensions during project bootstrap (a real
+ * project's `postgres` role never has to — and in vanilla Postgres, structurally cannot —
+ * create a non-`trusted` extension itself). `create extension if not exists` in
+ * 0001_extensions.sql then no-ops for `db_owner`, without needing its own elevated privilege
+ * for extensions that already exist. */
+const REQUIRED_EXTENSIONS = ["pgcrypto", "citext", "moddatetime"];
+
 export async function createTestDb(): Promise<TestDb> {
   const name = `inv_test_${randomUUID().replace(/-/g, "")}`;
-  await psql(ADMIN_URL, ["-c", `create database ${name}`]);
-  const url = urlForDb(name);
+
+  // Roles are cluster-wide, not per-database — concurrent Vitest workers (separate
+  // processes) each calling `createTestDb()` race on "does this role exist yet", not just on
+  // creating it, so each creation tolerates a concurrent duplicate rather than checking
+  // existence first. `service_role` needs `BYPASSRLS`, which only the superuser admin
+  // connection (not `db_owner` itself — see OWNER_ROLE's comment) can grant, so every
+  // Supabase-platform role this project's tests rely on is created here, once, up front.
+  for (const stmt of [
+    `create role ${OWNER_ROLE} login password '${OWNER_PASSWORD}' createrole`,
+    "create role anon nologin",
+    "create role authenticated nologin",
+    "create role service_role nologin bypassrls",
+  ]) {
+    try {
+      await psql(ADMIN_URL, ["-c", stmt]);
+    } catch (error) {
+      if (!/already exists/.test((error as Error).message)) throw error;
+    }
+  }
+  // `db_owner` needs to be able to `SET ROLE` into all three — creating a role does not by
+  // itself grant the creator membership in it.
+  await psql(ADMIN_URL, ["-c", `grant anon, authenticated, service_role to ${OWNER_ROLE}`]);
+
+  await psql(ADMIN_URL, ["-c", `create database ${name} owner ${OWNER_ROLE}`]);
+
+  const superuserUrlForNewDb = urlForDb(name);
+  // `public` (and every other schema inherited from `template1`) is NOT retroactively
+  // reassigned by `CREATE DATABASE ... OWNER` — only the pg_database row's owner changes.
+  // Transfer `public`'s ownership explicitly (must be done by the superuser admin
+  // connection: only an object's current owner, or a superuser, may reassign it).
+  await psql(superuserUrlForNewDb, ["-c", `alter schema public owner to ${OWNER_ROLE}`]);
+  for (const ext of REQUIRED_EXTENSIONS) {
+    await psql(superuserUrlForNewDb, ["-c", `create extension if not exists "${ext}"`]);
+  }
+
+  const url = urlForDb(name, OWNER_ROLE, OWNER_PASSWORD);
   await psql(url, ["-f", AUTH_STUB_PATH]);
+  await psql(url, ["-f", STORAGE_STUB_PATH]);
   for (const file of migrationFiles()) {
     await psql(url, ["-f", file]);
   }
@@ -92,8 +156,8 @@ export interface RunAs {
   /** auth.uid() for the statement — sets `request.jwt.claim.sub` before running. */
   userId?: string;
   /** Postgres role to run as. Defaults to `authenticated` when `userId` is set, otherwise
-   * the raw admin/superuser connection role (used for fixture setup, which intentionally
-   * bypasses RLS). */
+   * `db_owner` (the connection's own role — the non-superuser owner of every migrated
+   * object, used for fixture setup; RLS-exempt only for tables without `FORCE`). */
   role?: "anon" | "authenticated" | "service_role";
 }
 

@@ -35,19 +35,11 @@ as $$
     )::uuid
 $$;
 
-do $$
-begin
-  if not exists (select 1 from pg_roles where rolname = 'anon') then
-    create role anon nologin;
-  end if;
-  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
-    create role authenticated nologin;
-  end if;
-  if not exists (select 1 from pg_roles where rolname = 'service_role') then
-    create role service_role nologin bypassrls;
-  end if;
-end
-$$;
+-- `anon`/`authenticated`/`service_role` and the `db_owner`-to-them membership grants are
+-- created by the superuser admin connection in tests/db/harness.ts, not here — creating a
+-- role with `BYPASSRLS` (`service_role`) itself requires `BYPASSRLS`, which `db_owner` (the
+-- role this script and every migration run as — deliberately a non-superuser, see
+-- harness.ts's `OWNER_ROLE` comment) does not and must not have.
 
 grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;

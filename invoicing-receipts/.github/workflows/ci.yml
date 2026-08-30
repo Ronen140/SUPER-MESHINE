@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "invoicing-receipts/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "invoicing-receipts/**"
+      - ".github/workflows/ci.yml"
+
+defaults:
+  run:
+    working-directory: invoicing-receipts
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    # ADR-INV-001 Implementation Notes #1 / Open Question #3 (no Docker in this project's dev
+    # sandbox, and no `supabase start` locally): CI instead uses a plain `postgres:16`
+    # services container plus this project's own `tests/db/auth-stub.sql` /
+    # `tests/db/storage-stub.sql` fixtures to stand in for the parts of the Supabase platform
+    # (auth schema, storage schema, anon/authenticated/service_role roles) that a real
+    # Supabase project provides but a bare Postgres image does not. Documented here rather
+    # than attempting `supabase start` in CI, which needs Docker-in-Docker this environment
+    # cannot provide either.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # Every DB-backed test (tests/db/harness.ts) and script (scripts/*.sh) reads
+      # DATABASE_URL and builds its own throwaway `db_owner`-owned database from it — nothing
+      # in this job talks to `postgres`/`public.postgres` directly.
+      NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub's ubuntu-latest runner image ships `psql` pre-installed (documented in the
+      # runner image's software manifest) — this step is a defensive no-op if so, and a real
+      # install if that manifest ever changes. Every migration/test in this project depends
+      # on `psql` being present (tests/db/harness.ts, scripts/*.sh) — not this project's own
+      # dependency to manage via pnpm.
+      - name: Ensure psql is available
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: invoicing-receipts/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Migration down/up roundtrip + 8 schema meta-checks
+        run: bash scripts/migrate-down-up-roundtrip.sh
+
+      - name: Test (unit + DB-backed: Addendum A′, B11 isolation [17+2 assertions], B12 numbering race)
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

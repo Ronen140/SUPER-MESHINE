@@ -261,10 +261,63 @@ end;
 $$;
 
 -- ============================================================================
+-- app.compute_line() -> public.compute_line() — an independent bug found while writing this
+-- round's required automated tests (ADR-INV-002 Implementation Notes #5), not one of the
+-- three enumerated Addendum A′ items, but blocking enough of D8 layer 1 (the live draft
+-- preview) to fix in the same migration rather than deferring: flagged for architect
+-- confirmation the same way the A′-1 dead-code finding was in 0009.
+--
+-- The bug: `app.document_lines_compute()` is (correctly, per ADR-INV-001 §D3.2's "trigger
+-- functions that only validate must be INVOKER" rule extended to this one, which computes
+-- rather than validates but still needs no elevated access of its own) SECURITY INVOKER, and
+-- it calls `app.compute_line()`. A schema-qualified reference inside a function body run as
+-- SECURITY INVOKER is resolved (and privilege-checked) using the *calling* role at execution
+-- time — unlike an RLS policy's USING/CHECK expression, which is parsed once by the schema
+-- owner at CREATE POLICY time and never re-resolves the name at query time (ADR-INV-001
+-- Amendment B-3's own distinction). Verified empirically (not assumed) before writing this
+-- fix: `set role authenticated; select * from app.compute_line(...)` fails with "permission
+-- denied for schema app" even after granting EXECUTE on that one function — USAGE on the
+-- schema is a second, independent gate that a plain client INSERT/UPDATE on `document_lines`
+-- cannot get past, because `document_lines_compute()`'s own body re-triggers that same
+-- USAGE check on every call.
+--
+-- Consequence if left unfixed: `app.document_lines_compute()` only ever worked when it fired
+-- as a side effect of `public.issue_document()` (a SECURITY DEFINER function — the *entire*
+-- call stack underneath it, including this trigger and its call to compute_line(), runs as
+-- the function owner `postgres`, who is exempt from every grant check). It silently failed
+-- for the actual primary use case D8 layer 1 exists for: a real `authenticated` client
+-- editing/autosaving a draft's line items directly, with no `issue_document()` anywhere in
+-- the call stack. Every draft line insert/update from the real app would have raised
+-- "permission denied for schema app".
+--
+-- The fix: move `compute_line()` to `public`, with the exact REVOKE/GRANT pattern ADR-INV-001
+-- §D3.3 already mandates for every function in `public` — not `grant usage on schema app to
+-- authenticated` (explicitly forbidden by §D3, and disproportionate: that would open *every*
+-- current and future function in `app` to name resolution by any authenticated client), and
+-- not adding `document_lines_compute()` to the closed 9-function SECURITY DEFINER whitelist
+-- (disproportionate the other way: it would let a compute-only trigger run with `postgres`'s
+-- full bypass-RLS privileges for no reason it actually needs). `compute_line()` itself is a
+-- pure, stateless, `immutable` SQL function with no table access and no tenant data in its
+-- inputs or outputs — the same "safe even if called directly" property §D3 already relies on
+-- for `current_business_ids()`/`has_role()` being exposed with narrow EXECUTE grants, just
+-- one schema over. Being technically PostgREST-reachable as `supabase.rpc('compute_line', ...)`
+-- is a non-issue for the same reason.
+-- ============================================================================
+
+alter function app.compute_line(numeric, numeric, numeric, public.vat_treatment, numeric)
+  set schema public;
+
+revoke execute on function public.compute_line(numeric, numeric, numeric, public.vat_treatment, numeric)
+  from public, anon;
+grant  execute on function public.compute_line(numeric, numeric, numeric, public.vat_treatment, numeric)
+  to authenticated;
+
+-- ============================================================================
 -- app.document_lines_compute() (0009_amendments.sql) — layer 1 VAT-rate fix (A′-1 confirmed,
 -- A′-3 refinement). Adds `v_issue_date` to the initial lookup and folds it into the
--- `coalesce` ahead of `current_date`, matching layer 2's rule exactly. Everything else
--- (compute_line() call, trigger name/ordering, the layer-3 CHECK) is unchanged.
+-- `coalesce` ahead of `current_date`, matching layer 2's rule exactly. Also updated to call
+-- `public.compute_line()` (moved above) instead of `app.compute_line()`. Everything else
+-- (trigger name/ordering, the layer-3 CHECK) is unchanged.
 -- ============================================================================
 
 create or replace function app.document_lines_compute()
@@ -310,7 +363,7 @@ begin
   end if;
 
   select * into v_computed
-    from app.compute_line(new.quantity, new.unit_price, new.discount_percent, new.vat_treatment, v_vat_rate);
+    from public.compute_line(new.quantity, new.unit_price, new.discount_percent, new.vat_treatment, v_vat_rate);
 
   new.discount_amount := v_computed.discount_amount;
   new.line_net         := v_computed.line_net;
