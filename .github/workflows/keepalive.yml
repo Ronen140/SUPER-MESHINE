@@ -1,0 +1,43 @@
+name: Keepalive
+
+# B14 (invoicing-receipts/ — an independent pnpm project inside this monorepo, see
+# CLAUDE.md). Supabase Free suspends a project after 7 days with no activity
+# (invoicing-receipts/docs/adr/003-pdf-signing-storage.md §D5). This runs a trivial query
+# against the live database daily to reset that clock. It is a distinct, much simpler
+# concern than invoicing-receipts/scripts/backup-to-r2.sh (which protects data, not
+# uptime) — kept as its own workflow rather than folded into backup.yml so the two can be
+# monitored/retried independently and one failing never blocks the other.
+#
+# Lives at the true repository root (not invoicing-receipts/.github/workflows/) because
+# GitHub Actions only discovers workflow files under <repo-root>/.github/workflows/ — a
+# platform requirement, not a style choice. See the B14 status report for why this also
+# meant relocating ci.yml, which was previously nested and therefore could never have
+# triggered on push/PR despite being "accepted" in the Phase 0 review.
+
+on:
+  schedule:
+    # 03:00 UTC daily — comfortably outside any plausible business-hours window, and far
+    # enough from backup.yml's own cron (also below) that the two never compete for the
+    # same runner minute.
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ensure psql is available
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      - name: Ping the database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "keepalive: skipping — SUPABASE_DB_URL secret is not configured yet. See invoicing-receipts/docs/ops-runbook.md."
+            exit 0
+          fi
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -X -q -c "select 1;"
+          echo "keepalive: OK"

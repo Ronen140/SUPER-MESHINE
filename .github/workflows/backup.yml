@@ -1,0 +1,49 @@
+name: Backup to R2
+
+# B14 (invoicing-receipts/ — an independent pnpm project inside this monorepo, see
+# CLAUDE.md). Daily encrypted off-site copy of the live Supabase Postgres database
+# (invoicing-receipts/docs/adr/003-pdf-signing-storage.md §D5): Supabase Free retains zero
+# backups of its own, so this is the only durable copy of documents this project is legally
+# required to keep for 7 years, until/unless the founder upgrades to Supabase Pro
+# (ADR-INV-003 §C3 — a founder decision, not made here).
+#
+# All the actual logic lives in invoicing-receipts/scripts/backup-to-r2.sh (dump, encrypt,
+# upload, rotate) — this workflow only wires up secrets and installs prerequisites. The
+# script itself does a clean, logged, exit-0 skip if any required secret is missing, so
+# this workflow is safe to leave enabled even before the founder's live-Supabase setup
+# session (see invoicing-receipts/docs/ops-runbook.md).
+#
+# Lives at the true repository root — see keepalive.yml's header for why.
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 04:00 UTC daily, after keepalive.yml's 03:00 slot.
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: invoicing-receipts
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same defensive pattern as ci.yml's "Ensure psql is available" — pg_dump ships in
+      # the same postgresql-client package. The `aws` CLI itself is expected pre-installed
+      # on GitHub's ubuntu-latest image; scripts/lib-r2.sh falls back to `pip3 install
+      # awscli` on its own if that assumption ever stops holding, so no separate step for
+      # it is needed here.
+      - name: Ensure pg_dump is available
+        run: command -v pg_dump || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      - name: Run backup-to-r2.sh
+        run: bash scripts/backup-to-r2.sh

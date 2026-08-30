@@ -85,7 +85,7 @@ jobs:
       - name: Migration down/up roundtrip + 8 schema meta-checks
         run: bash scripts/migrate-down-up-roundtrip.sh
 
-      - name: Test (unit + DB-backed: Addendum A′, B11 isolation [17+2 assertions], B12 numbering race)
+      - name: "Test (unit + DB-backed: Addendum A′, B11 isolation [17+2 assertions], B12 numbering race)"
         run: pnpm test
 
       - name: Build

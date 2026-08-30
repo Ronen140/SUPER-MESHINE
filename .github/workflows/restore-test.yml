@@ -1,0 +1,56 @@
+name: Restore Test
+
+# B14 (invoicing-receipts/ — an independent pnpm project inside this monorepo, see
+# CLAUDE.md). Monthly proof that the encrypted off-site backup (backup.yml /
+# invoicing-receipts/scripts/backup-to-r2.sh) is actually restorable, per
+# invoicing-receipts/docs/adr/003-pdf-signing-storage.md §D5 ("חודשי: בדיקת שחזור"). Runs
+# invoicing-receipts/scripts/restore-test.sh against this job's own disposable `postgres:16`
+# services container — never against the live Supabase database. Same clean, logged,
+# exit-0 skip contract as backup.yml if the required secrets aren't configured yet.
+#
+# Lives at the true repository root — see keepalive.yml's header for why.
+
+on:
+  schedule:
+    - cron: "0 5 1 * *" # 05:00 UTC on the 1st of each month.
+  workflow_dispatch: {}
+
+jobs:
+  restore-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: invoicing-receipts
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      RESTORE_TARGET_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure psql is available
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      - name: Run restore-test.sh
+        run: bash scripts/restore-test.sh
