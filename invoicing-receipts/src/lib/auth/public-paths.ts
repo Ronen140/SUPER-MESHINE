@@ -5,7 +5,7 @@
  * static assets, filtered separately by the middleware `matcher`) are public.
  * Pure function so the policy is unit-testable without spinning up a request.
  */
-const PUBLIC_PATH_PREFIXES = ["/login", "/signup", "/auth", "/dev-preview-f3-f4"] as const;
+const PUBLIC_PATH_PREFIXES = ["/login", "/signup", "/auth"] as const;
 
 export function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATH_PREFIXES.some(
