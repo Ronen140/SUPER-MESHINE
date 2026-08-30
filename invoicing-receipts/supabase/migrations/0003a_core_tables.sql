@@ -24,23 +24,6 @@
 -- this migration includes since it directly guards the `businesses` table B3 creates.
 
 -- ============================================================================
--- Generic updated_at maintenance (ADR-INV-001 Implementation Notes #4: businesses,
--- customers, items get auto-touched updated_at on every UPDATE). Plain trigger function
--- instead of the `moddatetime` contrib extension to avoid an extra extension dependency
--- for one column per table.
--- ============================================================================
-
-create function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at := now();
-  return new;
-end;
-$$;
-
--- ============================================================================
 -- users — profile extension of auth.users. Identity source of truth is Supabase Auth;
 -- this table only adds the app-specific profile fields the UI needs.
 -- ============================================================================
@@ -173,10 +156,12 @@ create trigger businesses_protect_identity_trg
   for each row
   execute function public.protect_business_identity();
 
+-- ADR-INV-001 Implementation Notes #4: `moddatetime` contrib extension (0001_extensions.sql)
+-- auto-touches updated_at on every UPDATE.
 create trigger businesses_set_updated_at
   before update on businesses
   for each row
-  execute function public.set_updated_at();
+  execute function moddatetime(updated_at);
 
 -- ============================================================================
 -- business_members — many-to-many user<->business, with role. "At least one owner"
@@ -277,10 +262,11 @@ create table customers (
 create index        customers_lookup_idx on customers (business_id, is_active, name);
 create unique index customers_taxid_uk   on customers (business_id, tax_id) where tax_id is not null;
 
+-- ADR-INV-001 Implementation Notes #4: `moddatetime` contrib extension.
 create trigger customers_set_updated_at
   before update on customers
   for each row
-  execute function public.set_updated_at();
+  execute function moddatetime(updated_at);
 
 -- ============================================================================
 -- items — per-business catalog of billable work/products.
@@ -304,10 +290,11 @@ create table items (
 create unique index items_name_uk on items (business_id, lower(name)) where is_active;
 create index        items_recent_idx on items (business_id, last_used_at desc nulls last);
 
+-- ADR-INV-001 Implementation Notes #4: `moddatetime` contrib extension.
 create trigger items_set_updated_at
   before update on items
   for each row
-  execute function public.set_updated_at();
+  execute function moddatetime(updated_at);
 
 -- ============================================================================
 -- customer_document_consents — consent to receive computerized ("original") documents
