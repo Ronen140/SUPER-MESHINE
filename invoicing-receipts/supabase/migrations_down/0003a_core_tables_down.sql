@@ -1,4 +1,4 @@
--- Down for 0003_core_tables.sql — reverse dependency order.
+-- Down for 0003a_core_tables.sql — reverse dependency order.
 
 drop table if exists customer_document_consents;
 
@@ -15,6 +15,8 @@ drop function if exists public.enforce_business_min_owner();
 drop table if exists business_members;
 
 drop trigger if exists businesses_set_updated_at on businesses;
+drop trigger if exists businesses_protect_identity_trg on businesses;
+drop function if exists public.protect_business_identity();
 drop table if exists businesses;
 
 drop table if exists vat_rates;

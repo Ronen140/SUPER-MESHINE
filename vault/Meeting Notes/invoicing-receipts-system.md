@@ -2,7 +2,7 @@
 
 ## Overview
 
-פרויקט חדש שהמייסד ביקש לפתוח: מערכת חשבוניות וקבלות **רב-עסקית** למייסד ולחבריו — מספר עסקים נפרדים (עוסק פטור + עוסק מורשה לפחות) במערכת אחת, חינמית לתפעול. ליבה: קבלות לעוסק פטור, חשבונית מס / מס-קבלה / זיכוי לעוסק מורשה, קטלוג פריטי עבודה עם סכום פתוח עד הפקה, מצב טיוטה→הפקה עם נעילה ומספור רציף, ייצוא לרו"ח. נפח צפוי זעום (~2 מסמכים/חודש לעסק). הפרויקט יושב ב-`invoicing-receipts/` בשורש הריפו (מחוץ ל-pnpm workspace). תוכנית פיתוח מלאה ב-`docs/plan.md`; **הארכיטקטורה נקבעה ב-3 ADRs ב-`invoicing-receipts/docs/adr/`** — ADR-INV-001 **Accepted (amended)**, ADR-INV-002 ו-003 Proposed. Phase 0 בביצוע לפי `vault/Engineering/invoicing-phase-0-plan.md`.
+פרויקט חדש שהמייסד ביקש לפתוח: מערכת חשבוניות וקבלות **רב-עסקית** למייסד ולחבריו — מספר עסקים נפרדים (עוסק פטור + עוסק מורשה לפחות) במערכת אחת, חינמית לתפעול. ליבה: קבלות לעוסק פטור, חשבונית מס / מס-קבלה / זיכוי לעוסק מורשה, קטלוג פריטי עבודה עם סכום פתוח עד הפקה, מצב טיוטה→הפקה עם נעילה ומספור רציף, ייצוא לרו"ח. נפח צפוי זעום (~2 מסמכים/חודש לעסק). הפרויקט יושב ב-`invoicing-receipts/` בשורש הריפו (מחוץ ל-pnpm workspace). תוכנית פיתוח מלאה ב-`docs/plan.md`; **הארכיטקטורה נקבעה ב-3 ADRs ב-`invoicing-receipts/docs/adr/`** — ADR-INV-001 **Accepted (amended)**, ADR-INV-002 ו-003 Proposed. Phase 0 בביצוע לפי `vault/Engineering/invoicing-phase-0-plan.md`: **B1-B4 (scaffold + migrations 0001-0004: extensions, enums, טבלאות ליבה, טבלאות מסמכים) בוצעו ואומתו ע"י backend-builder**; B5-B13 (RLS, audit/immutability triggers, `issue_document()`, יצירת עסק, tests, CI, ops) ו-F1-F4 (frontend) טרם בוצעו.
 
 ## Open Questions
 
@@ -15,6 +15,7 @@
 - לוח ספי מספר ההקצאה (10,000 ₪ מ-1.1.2026, 5,000 ₪ מ-1.6.2026) אומת ממקורות משניים בלבד — לאמת מול gov.il לפני Phase 2; תהליך ההרשמה ל-API רשות המסים טרם נחקר.
 - מיצוב ארוך-טווח: כלי פרטי לחבורה או גרעין מודול Billing של SUPER-MESHINE? (לא חוסם MVP. אם כן — יידרש יישור מול ADR-002 שאין בו many-to-many של user↔tenant, ומול ADR-006 בגלל ה-audit ב-triggers בלבד.)
 - קודי הצבע המדויקים של Morning לא אומתו (אתר חסום ב-proxy) — לא חוסם.
+- **סביבת הפיתוח הנוכחית של backend-builder אין בה Docker daemon פעיל** (ה-binary קיים אך `dockerd` לא עולה בסביבת ה-sandbox — הרשאות `ulimit`). `supabase start`/`supabase db reset` לא רצים בפועל; migrations 0001-0004 אומתו ישירות מול Postgres 16 מקומי (`postgresql-16` apt package) + stub ידני זמני ל-`auth.users`/`auth.uid()` (לא ל-commit). B12 (CI pipeline) עדיין צריך להחליט אם ה-CI runner עצמו יריץ Docker אמיתי (`supabase start`) או stub דומה — ראו Open question #3 המקורי ב-`vault/Engineering/invoicing-phase-0-plan.md`. לא חוסם B1-B4; עלול לחסום B10-B12 אם ה-CI runner גם הוא ללא Docker.
 
 ## Session Log
 
@@ -89,3 +90,30 @@
   - ADR-INV-002 ו-003 לא הצריכו שינוי (FORCE הוזכר רק ב-001), אבל **ADR-INV-002 היה נשבר בפועל בלי A-4**.
   - חוב שנוצר: כל פונקציית definer עתידית מדלגת על RLS. בדיקת CI (ה) היא חובה, לא nice-to-have.
 - **Related:** [[002-multi-tenancy-strategy]], `vault/Engineering/invoicing-phase-0-plan.md`
+
+### 2026-08-30 — Phase 0 Batch 1 (B1-B4): scaffold + schema migrations [done]
+- **What was done:** backend-builder ביצע B1-B4 מ-`vault/Engineering/invoicing-phase-0-plan.md`.
+  - **B1:** scaffold pnpm עצמאי ב-`invoicing-receipts/` — Next.js 15.5.24 (App Router, TS strict), Tailwind v4 (`@tailwindcss/postcss`), Biome 2.5.11, Vitest 4, `supabase` CLI כ-devDependency (npm-wrapped binary, לא global install). נוסף `pnpm-workspace.yaml` מקומי — **בלעדיו `pnpm install` בתוך `invoicing-receipts/` "טיפס" ל-workspace של השורש והתקין את כל 8 חבילות ה-ERP ל-root `node_modules`** (side-effect לא מכוון, לא נגע ב-`pnpm-lock.yaml`/`package.json` של השורש, אך שווה לדעת — כל תיקיית פרויקט "עצמאית" עתידית מתחת לשורש חייבת את אותו קובץ). `biome.json` עם `noRestrictedImports` (pattern `**/service-role/**`) אוכף את ADR-INV-001 §D5 — נבדק ידנית (import מבחוץ נכשל, import יחסי מבפנים עובר) ותועד ב-PR. נכתב `src/server/service-role/client.ts` (TDD: RED→GREEN) כ-proof-of-concept ראשון למודול המוגן.
+  - **B2:** `0001_extensions.sql` (`pgcrypto`, `citext`), `0002_enums.sql` (9 enums) + down מקבילים.
+  - **B3:** `0003_core_tables.sql` — 8 טבלאות (`users`+auth-sync trigger, `vat_rates`+seed, `businesses`, `business_members`+owner-guard trigger, `business_signing_keys`, `customers`, `items`, `customer_document_consents`) + `set_updated_at()` על businesses/customers/items. **כולל גם `businesses_protect_identity_trg`** (חוסם שינוי `created_by`/`tax_id`/`entity_type`) — נדרש ע"י Amendment A §D3.1 שהתפרסם *תוך כדי* עבודת ה-batch הזה (ראה session log הקודם); RLS/create_business() עצמם (שאר Amendment A) נשארו מחוץ ל-scope (B6/B9).
+  - **B4:** `0004_document_tables.sql` — 7 טבלאות (`documents` עם `signed_total` generated column, `document_lines`, `payments`, `document_counters`, `allocation_requests`, `document_public_links`, `audit_log`). **ללא שום RLS statement**, כולל עבור `business_signing_keys`/`document_counters`/`audit_log` שה-ADR מציג את ה-RLS שלהן inline בסקשן ה-Schema — הוחלט להעביר את כל ה-RLS (enable/force/policies) ל-B6 כמיגרציה אטומית אחת, כי `counters_read` (המקורי, לפני Amendment A-4) היה תלוי בפונקציית `app.current_business_ids()` שלא קיימת עד B5.
+- **Decisions:**
+  - מספור המיגרציות (`0001`-`0004`) עוקב אחרי חלוקת המשימות של ה-EM (שפיצל את "0003_core_tables" ל-B3+B4 בתור שני קבצים), **לא** אחרי המספור המקורי ב-ADR-INV-001 §Implementation Notes (שם 0003 מכיל את כל הטבלאות ו-0004 הוא RLS helpers). אין סתירה מהותית — רק היסט מספרי; מתועד בראש כל קובץ מיגרציה.
+  - `updated_at` על `businesses`/`customers`/`items`: נבחר trigger plpgsql פשוט (`public.set_updated_at()`) במקום extension `moddatetime` שה-ADR מזכיר ב-Implementation Note #4 — נמנע תלות ב-extension נוספת לעמודה אחת לטבלה; אותה תוצאה פונקציונלית.
+  - אין Docker daemon בסביבת ה-sandbox (`dockerd` נכשל על `ulimit`/הרשאות) → `supabase start` לא עלה בפועל. אימות המיגרציות נעשה ישירות מול Postgres 16 מותקן מקומית (חבילת apt), עם schema `auth` + טבלת `auth.users` + `auth.uid()` **stub זמני שלי בלבד** (לא ל-commit, לא חלק מה-migrations) — נחוץ כי `public.users` ב-B3 מפנה FK ל-`auth.users` וה-trigger `on_auth_user_created` יורה על insert אליה.
+- **Verified (בפועל, לא רק "נראה תקין"):**
+  - `pnpm install`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm check`, `pnpm format`, `pnpm test` (3/3, TDD על `createServiceRoleClient`) — כולם exit 0.
+  - `pnpm dev` מרים על `localhost:3000` (נבדק עם curl, 200).
+  - `noRestrictedImports`: import חיצוני מ-`src/app/page.tsx` ל-`@/server/service-role/client` הפיל את `pnpm lint` עם ההודעה הצפויה; import יחסי פנימי (`./internal-helper`) לא הפיל.
+  - מיגרציות 0001→0004 עולות נקי על Postgres מקומי; 15 טבלאות, 9 enums, 2 שורות seed ב-`vat_rates`; כל 13 ה-CHECK constraints + 15 האינדקסים מה-ADR קיימים (נבדק מול `pg_constraint`/`pg_indexes`).
+  - `signed_total`: שורה רגילה total=118 → signed_total=118; `credit_note` total=100 → signed_total=-100.
+  - `doc_type_allowed_for_entity`/`patur_has_no_vat`: INSERT פטור+`tax_invoice` ופטור+`vat_amount>0` נכשלים כצפוי; INSERT מורשה+`tax_invoice`+מע"מ מצליח.
+  - `business_members` owner-guard: UPDATE ל-`editor` ו-DELETE של ה-owner היחיד נכשלים עם `INV_NO_OWNER`; הוספת owner שני לפני ההורדה מצליחה.
+  - `businesses_protect_identity_trg`: שינוי `created_by`/`tax_id`/`entity_type` נכשל (3/3); שינוי `legal_name` מצליח (control חיובי).
+  - `on_auth_user_created`: insert ל-`auth.users` עם/בלי `full_name` ב-metadata יוצר שורת `public.users` תואמת (כולל fallback ל-local-part של האימייל).
+  - **Down/up roundtrip מלא:** 0004→0003→0002→0001 יורדים ל-0 טבלאות/enums/extensions, ואז עולים חזרה ל-15/9/2 — פעמיים (unit-level לכל migration + roundtrip מלא בסוף).
+- **Notes / Caveats:**
+  - נתגלה ותועד side-effect: `pnpm install` בתוך תיקיית פרויקט "עצמאית" תחת שורש שיש בו `pnpm-workspace.yaml` **חייב** קובץ `pnpm-workspace.yaml` מקומי משלו, אחרת pnpm מתייחס לתיקיית השורש כ-scope ומתקין את כל שאר הפרויקטים.
+  - יש **commit `wip(...)` אוטומטי** בהיסטוריה (`416c9bc`) שנוצר ע"י מנגנון checkpoint של הסביבה, לא ע"י backend-builder במכוון (backend-builder לא מריץ `git commit`/`git push` לפי ההנחיה) — ה-CEO/orchestrator צריך להיות מודע לכך לפני commit/push סופי של ה-batch.
+  - B5-B13 ו-F1-F4 לא בוצעו (מחוץ ל-scope של הבאץ' הזה).
+- **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]]

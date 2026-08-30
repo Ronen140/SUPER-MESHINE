@@ -1,14 +1,27 @@
--- 0003_core_tables.sql
+-- 0003a_core_tables.sql
 -- ADR-INV-001 §Schema — "global" + "businesses & membership" + "signing keys" +
 -- "customers, catalog, consents" tables. Columns/constraints/indexes verbatim from the ADR.
+--
+-- Filename note: the ADR's own Implementation Notes #1 lists a single "0003_core_tables"
+-- migration. The engineering plan (vault/Engineering/invoicing-phase-0-plan.md, B3/B4) splits
+-- it into 0003a (this file, core/global/membership tables) and 0003b (document tables) for
+-- reviewable chunk size, using a letter suffix specifically so every migration number *after*
+-- 0003 still matches the ADR's canonical numbering exactly (0004_rls_helpers, 0005_rls_policies,
+-- ... 0009_create_business) — no renumbering needed downstream.
 --
 -- RLS (enable/force/policies) is deliberately NOT part of this migration for ANY table,
 -- including business_signing_keys and document_counters even though the ADR's schema
 -- listing shows their `enable/force row level security` inline: the generic RLS pass runs
--- as a single later migration (0005_rls_helpers.sql / 0006_rls_policies.sql) so that every
+-- as a single later migration (0004_rls_helpers.sql / 0005_rls_policies.sql) so that every
 -- table becomes RLS-protected in one atomic, reviewable step. Until then this migration
 -- creates tables with RLS *disabled* — acceptable because there is no data and no
 -- non-migration write path yet.
+--
+-- NOTE (ADR-INV-001 Amendment A, applied 2026-08-30 while this migration was in progress):
+-- `businesses` gets RLS policies (§D3.1) and `app.create_business()` (§D10) in later
+-- migrations (B6/B9) — out of scope here. The one piece of Amendment A that IS schema-level
+-- (not RLS/security-definer dependent) is `businesses_protect_identity_trg` below, which
+-- this migration includes since it directly guards the `businesses` table B3 creates.
 
 -- ============================================================================
 -- Generic updated_at maintenance (ADR-INV-001 Implementation Notes #4: businesses,
@@ -129,6 +142,36 @@ create table businesses (
 );
 
 create unique index businesses_tax_id_uk on businesses (tax_id);
+
+-- ADR-INV-001 §D3.1 (Amendment A-1): created_by/tax_id/entity_type are immutable after
+-- creation. tax_id changing would sever historical documents from the legal entity that
+-- issued them; entity_type changing is a regulatory event that needs an explicit procedure
+-- (see the ADR's Reversal Conditions), not a form edit.
+create function public.protect_business_identity()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.created_by is distinct from old.created_by then
+    raise exception 'INV_IMMUTABLE_FIELD: businesses.created_by cannot be changed'
+      using errcode = 'P0001';
+  end if;
+  if new.tax_id is distinct from old.tax_id then
+    raise exception 'INV_IMMUTABLE_FIELD: businesses.tax_id cannot be changed'
+      using errcode = 'P0001';
+  end if;
+  if new.entity_type is distinct from old.entity_type then
+    raise exception 'INV_IMMUTABLE_FIELD: businesses.entity_type cannot be changed without an explicit migration procedure'
+      using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger businesses_protect_identity_trg
+  before update on businesses
+  for each row
+  execute function public.protect_business_identity();
 
 create trigger businesses_set_updated_at
   before update on businesses
