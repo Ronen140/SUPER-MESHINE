@@ -1,1 +1,103 @@
 @import "tailwindcss";
+
+/*
+ * Design tokens — vault/Discovery/2026-08-30-invoicing-ui-design-research.md
+ * "שקט של Stripe, חום של Morning": neutral stone background/surfaces,
+ * a single warm emerald primary, semantic status colors only beyond that.
+ */
+:root {
+  --radius: 0.625rem;
+
+  --background: #fafaf9; /* stone-50 */
+  --foreground: #1c1917; /* stone-900 */
+
+  --card: #ffffff;
+  --card-foreground: #1c1917;
+
+  --popover: #ffffff;
+  --popover-foreground: #1c1917;
+
+  --primary: #047857; /* emerald-700 */
+  --primary-foreground: #ecfdf5; /* emerald-50 */
+
+  --secondary: #f5f5f4; /* stone-100 */
+  --secondary-foreground: #1c1917;
+
+  --muted: #f5f5f4; /* stone-100 */
+  --muted-foreground: #57534e; /* stone-600 */
+
+  --accent: #f5f5f4;
+  --accent-foreground: #1c1917;
+
+  --destructive: #b91c1c; /* red-700 */
+  --destructive-foreground: #fef2f2; /* red-50 */
+
+  --success: #047857;
+  --success-foreground: #ecfdf5;
+  --warning: #b45309; /* amber-700 */
+  --warning-foreground: #fffbeb; /* amber-50 */
+
+  --border: #e7e5e4; /* stone-200 */
+  --input: #e7e5e4;
+  --ring: #059669; /* emerald-600 */
+}
+
+@theme inline {
+  --font-sans:
+    var(--font-assistant), Heebo, "Noto Sans Hebrew", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+
+  /* Numbers (amounts, document numbers, phone numbers, dates) must never use
+   * proportional digit widths — vault/Discovery/2026-08-30-invoicing-ui-design-research.md §3. */
+  .tabular-nums,
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+}
