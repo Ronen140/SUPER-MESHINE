@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 **Status:** Accepted
-**Amended:** 2026-08-30 — Amendment A (ראה סעיף "Amendment Log")
+**Amended:** 2026-08-30 — Amendment A, Amendment B (ראה סעיף "Amendment Log")
 **Decider:** Architect (proposed), CEO (final approval)
 **Scope:** פרויקט `invoicing-receipts` — עצמאי, מחוץ ל-pnpm workspace של ה-ERP.
 **Related:** [[002-multi-tenancy-strategy]], [[006-audit-log-and-agent-action-gating]] (עקרונות הבית — יורשים, לא מיישמים 1:1), ADR-INV-002, ADR-INV-003.
@@ -19,19 +19,30 @@
 |---|---|---|
 | A-1 | אין RLS policies לטבלת `businesses` עצמה | נוספו ב-§D3.1: SELECT לחברים, UPDATE ל-owner, **ללא INSERT ו-DELETE policies כלל** |
 | A-2 | בדיקת CI של D7 נכשלת תמיד על `businesses` (אין לה `business_id`) | §D7 נכתב מחדש עם **מפת scoping** במקום רשימת חריגים שטוחה; `businesses` מוגדרת כ-scoped-by-`id` |
-| A-3 | ביצה-ותרנגולת ביצירת עסק — `bm_manage` דורשת owner קיים | אושר: **`app.create_business()` ב-`SECURITY DEFINER`** (§D10). אין policy bootstrap ואין נתיב service_role רביעי |
-| A-4 | **⚠️ פער שלא דווח:** `FORCE ROW LEVEL SECURITY` הגורף ב-§D3 **שובר את כל דפוס ה-SECURITY DEFINER של ה-ADR** | §D3 תוקן: FORCE יורד מכל הטבלאות **פרט ל-`business_signing_keys`**. בדיקת CI (ב) התהפכה |
+| A-3 | ביצה-ותרנגולת ביצירת עסק — `bm_manage` דורשת owner קיים | אושר: **`create_business()` ב-`SECURITY DEFINER`** (§D10). אין policy bootstrap ואין נתיב service_role רביעי |
+| A-4 | **⚠️ פער שלא דווח:** `FORCE ROW LEVEL SECURITY` הגורף ב-§D3 **שובר את כל דפוס ה-SECURITY DEFINER של ה-ADR** | §D3.2 תוקן: FORCE יורד מכל הטבלאות **פרט ל-`business_signing_keys`**. בדיקת CI (ב) התהפכה |
 | A-5 | (קוסמטי) D7 הניחה טבלת `_migrations` | הוסרה — Supabase CLI כותב ל-`supabase_migrations.schema_migrations`, מחוץ ל-`public` |
 
-**הסבר ל-A-4, כי הוא משנה הנחת יסוד:** תחת `FORCE ROW LEVEL SECURITY`, גם בעלת הטבלה כפופה ל-policies. פונקציית `SECURITY DEFINER` רצה בזהות הבעלים שלה (`postgres`), שאינו חבר ב-`authenticated` — ולכן שום policy לא חלה עליו והתוצאה היא **דחייה**, לא בייפאס. שלוש תוצאות מעשיות שהיו מתגלות רק בזמן ריצה:
-
-1. `app.current_business_ids()` הייתה מחזירה 0 שורות ← **נעילה מוחלטת של כל המערכת** (או רקורסיה ב-`bm_peers`).
-2. `app.issue_document()` לא הייתה יכולה לכתוב ל-`document_counters`, שלה אין policy כתיבה **במכוון** ← אין הפקת מסמכים.
-3. ה-audit trigger לא היה יכול לכתוב ל-`audit_log`, שלה אין policy INSERT **במכוון** ← כל mutation נכשלת.
+**הסבר ל-A-4, כי הוא משנה הנחת יסוד:** תחת `FORCE ROW LEVEL SECURITY`, גם בעלת הטבלה כפופה ל-policies. פונקציית `SECURITY DEFINER` רצה בזהות הבעלים שלה (`postgres`), שאינו חבר ב-`authenticated` — ולכן שום policy לא חלה עליו והתוצאה היא **דחייה**, לא בייפאס. שלוש תוצאות מעשיות שהיו מתגלות רק בזמן ריצה: `app.current_business_ids()` מחזירה 0 שורות (נעילה מוחלטת), `issue_document()` לא יכולה לכתוב ל-`document_counters` (אין לה policy כתיבה במכוון), וה-audit trigger לא יכול לכתוב ל-`audit_log` (אין לה policy INSERT במכוון).
 
 תיעוד Postgres מפורש בנקודה: פונקציית security-definer מדלגת על RLS רק אם בעליה יכול — כלומר בעל התכונה `BYPASSRLS`, או בעלות על טבלה שאינה `FORCE`. הסתמכות על `BYPASSRLS` של `postgres` ב-Supabase היא הנחה על התנהגות פלטפורמה שאינה מתועדת כחוזה; לכן נבחרה הדרך הניידת — הורדת FORCE.
 
-שאר ה-ADR נותר כפי שאושר. ההחלטות A1-A6 שנשלחו לאישור לא הושפעו.
+### Amendment B — 2026-08-30 (ממצאי backend-builder בסיום B5-B8, חוסם B13)
+
+ה-builder דיווח על שני ממצאים. בבדיקתם התגלה **ממצא שלישי שהיה מפיל את אותן משימות**, ובנוסף נוספה החלטה מונעת-סחף. ארבעת התיקונים:
+
+| # | הממצא | התיקון |
+|---|---|---|
+| B-1 | `handle_new_auth_user()` (auth-sync trigger מ-B3) הוא definer לגיטימי שאינו ב-whitelist ⇒ CI (ה) נופלת | נוסף ל-whitelist. נשאר ב-`public` מסיבה טכנית מנומקת (§D3.3) |
+| B-2 | פונקציות ב-schema `app` בלתי-קריאות דרך `supabase.rpc()` — `app` אינו exposed schema ב-PostgREST | **§D3.3 חדש:** חוזה ה-RPC עובר ל-`public`, internals נשארים ב-`app`. **`app` לא ייחשף ל-PostgREST לעולם** |
+| B-3 | **⚠️ ממצא שלא דווח:** `revoke all on schema app from authenticated` ב-§D3 **שובר את הערכת ה-policies עצמן** | §D3 תוקן: `grant usage` על ה-schema + `grant execute` על שתי פונקציות ה-policy בלבד |
+| B-4 | (מונע-סחף) כל אירוע audit שאינו DML היה דורש פונקציית definer חדשה — ה-whitelist היה תופח בכל פיצ'ר | נוספה `public.log_event()` גנרית עם רשימת actions סגורה (§D11) |
+
+**הסבר ל-B-3.** ביטוי ה-policy רץ **בהרשאות המשתמש שמריץ את השאילתה**, לא בהרשאות בעל הטבלה. `customers_read` קורא ל-`app.current_business_ids()`; לכן `authenticated` חייב `USAGE` על schema `app` ו-`EXECUTE` על אותה פונקציה, אחרת **כל שאילתה** על **כל טבלה** נכשלת ב-`permission denied for schema app`. ה-`revoke all` הגורף שכתבתי ב-§D3 היה מייצר בדיוק את זה.
+
+השורש המשותף ל-B-2 ול-B-3 הוא בלבול בין שני מנגנונים נפרדים לחלוטין: **הרשאות Postgres** (`grant`/`revoke`) לעומת **חשיפת PostgREST** (`db-schemas` בקונפיג). `grant usage on schema app to authenticated` **אינו** הופך את `app` ל-endpoint; הוא רק מאפשר ל-policies לרוץ. החשיפה היא החלטה נפרדת, ותשובתה כאן: **לא**.
+
+*Amendment B לא הוסיף החלטות הטעונות אישור CEO — ארבעת התיקונים הם בסמכות הארכיטקט.*
 
 ---
 
@@ -89,24 +100,33 @@ create type actor_type       as enum ('user','service','system','anonymous');
 **החלטה על `credit_note` יחיד:** אין טיפוס נפרד ל"קבלת זיכוי". `credit_note` הוא מסמך ההיפוך היחיד; **הכותרת המודפסת נגזרת ממסמך האב ומסוג הישות** — "חשבונית זיכוי" מול `tax_invoice`/`tax_invoice_receipt`, "הודעת זיכוי" מול `receipt`/`proforma_invoice` או כשהעסק פטור. סדרת מספור אחת לזיכויים בכל עסק.
 *נימוק:* טיפוס שביעי היה מכפיל את מטריצת המספור, את מטריצת ההרשאות לפי סוג ישות ואת תבניות ה-PDF, בשביל הבחנה שהיא ויזואלית בלבד. **⚠️ טעון אישור רו"ח** — ראה סעיף האישורים.
 
-### D3 — RLS: helper functions ב-`SECURITY DEFINER`; FORCE **רק** על `business_signing_keys`
+### D3 — RLS: helper functions ב-`SECURITY DEFINER`
 
 ```sql
--- schema נפרד ללוגיקה פנימית; לא חשוף ל-PostgREST
+-- schema נפרד ללוגיקה פנימית. לא נחשף ל-PostgREST לעולם (§D3.3).
 create schema app;
-revoke all on schema app from anon, authenticated;
 
 create or replace function app.current_business_ids()
 returns setof uuid
-language sql stable security definer set search_path = public, pg_temp
+language sql stable security definer set search_path = ''
 as $$ select business_id from public.business_members where user_id = auth.uid() $$;
 
-create or replace function app.has_role(p_business uuid, p_roles member_role[])
+create or replace function app.has_role(p_business uuid, p_roles public.member_role[])
 returns boolean
-language sql stable security definer set search_path = public, pg_temp
+language sql stable security definer set search_path = ''
 as $$ select exists (select 1 from public.business_members
-                     where business_id = p_business and user_id = auth.uid() and role = any(p_roles)) $$;
+                     where business_id = p_business and user_id = auth.uid()
+                       and role = any(p_roles)) $$;
+
+-- הרשאות מדויקות  [Amendment B-3]
+grant  usage   on schema app to authenticated;      -- חובה: ה-policies קוראות ל-app.*
+revoke all     on all functions in schema app from public, anon, authenticated;
+grant  execute on function app.current_business_ids()                        to authenticated;
+grant  execute on function app.has_role(uuid, public.member_role[])          to authenticated;
+-- anon לא מקבל דבר. עמוד הצפייה הציבורי עובד ב-service_role (§D5).
 ```
+
+**⚠️ `grant usage on schema app` הוא חובה, לא הרפיה.** ביטוי ה-policy רץ בהרשאות **המשתמש שמריץ את השאילתה**. `customers_read` קורא ל-`app.current_business_ids()`; בלי `USAGE` על ה-schema ו-`EXECUTE` על הפונקציה, כל שאילתה על כל טבלה תיכשל ב-`permission denied for schema app`. הבידוד לא נפגע: `current_business_ids()` מחזירה את החברויות של הקורא עצמו, ו-`has_role()` בודקת את הקורא עצמו. שתיהן בטוחות לחשיפה ישירה — ומהותיות לתפקוד. **הרשאת Postgres אינה חשיפת PostgREST** (§D3.3).
 
 תבנית ה-policy האחידה (כל טבלה עסקית, ללא יוצא מן הכלל):
 
@@ -122,10 +142,11 @@ create policy customers_write on customers for all to authenticated
   with check (app.has_role(business_id, array['owner','editor']::member_role[]));
 ```
 
-שתי נקודות קריטיות:
+שלוש נקודות קריטיות:
 
-1. **`SECURITY DEFINER` הוא חובה, לא אופטימיזציה.** policy על `customers` שעושה subquery ל-`business_members` היה מפעיל את ה-RLS של `business_members` ← רקורסיה אינסופית. פונקציית definer שוברת את המעגל **בתנאי שבעליה באמת מדלג על RLS** (ראה D3.2). זו התקלה מספר 1 של RLS ב-Supabase והיא נמנעת בתכנון, לא ב-debug.
+1. **`SECURITY DEFINER` הוא חובה, לא אופטימיזציה.** policy על `customers` שעושה subquery ל-`business_members` היה מפעיל את ה-RLS של `business_members` ← רקורסיה אינסופית. פונקציית definer שוברת את המעגל **בתנאי שבעליה באמת מדלג על RLS** (D3.2).
 2. **`stable`** מאפשר ל-planner לקרוא לפונקציה פעם אחת לכל statement במקום לכל שורה.
+3. **`set search_path = ''` בכל פונקציית definer, עם שמות מלאים** (`public.business_members`, `public.member_role`). זה ה-hardening הסטנדרטי נגד search-path hijack בפונקציות definer, והוא זול. חל על **כל** הפונקציות ב-whitelist של D3.2.
 
 **RLS על `business_members` עצמה** (המקום שבו הרקורסיה מתחילה):
 ```sql
@@ -156,7 +177,7 @@ create policy businesses_update on businesses for update to authenticated
 -- ⚠️ אין policy ל-INSERT ואין policy ל-DELETE. במכוון.
 ```
 
-- **אין INSERT policy** — יצירת עסק עוברת אך ורק ב-`app.create_business()` (D10). זהו אותו דפוס שכבר נקבע ל-`document_counters` ול-`documents.status`: כשלכתיבה יש בדיוק נתיב לגיטימי אחד, הוא פונקציה צרה ולא policy רחבה.
+- **אין INSERT policy** — יצירת עסק עוברת אך ורק ב-`public.create_business()` (D10). זהו אותו דפוס שכבר נקבע ל-`document_counters` ול-`documents.status`: כשלכתיבה יש בדיוק נתיב לגיטימי אחד, הוא פונקציה צרה ולא policy רחבה.
 - **אין DELETE policy — לעולם.** מסמכים מפנים ל-`businesses` ב-`on delete restrict`, וארכיון של 7 שנים לא מוחקים. השבתה נעשית ב-`is_active = false`.
 - **`created_by`, `tax_id` ו-`entity_type` אינם ניתנים לשינוי** דרך ה-UPDATE policy: trigger `businesses_protect_identity_trg` חוסם שינוי בשלושתם. שינוי `tax_id` היה מנתק את המסמכים ההיסטוריים מהישות המשפטית שהפיקה אותם; שינוי `entity_type` הוא אירוע רגולטורי שדורש נוהל (ראה Reversal Conditions), לא עריכת טופס.
 
@@ -171,9 +192,58 @@ create policy businesses_update on businesses for update to authenticated
 **מה איבדנו ומה מחליף אותו.** FORCE נועד למנוע מ-session שרץ כ-`postgres` (SQL Editor, migration) לראות נתונים חוצי-עסקים. שלושה controls מחליפים אותו:
 1. האפליקציה **לעולם** אינה מתחברת כ-`postgres` — קיימים בה רק `anon`, `authenticated` ו-`service_role`.
 2. `service_role` דילג על FORCE ממילא (BYPASSRLS), כך ש-FORCE מעולם לא הגן מפני נתיב האיום הריאלי.
-3. **בדיקת CI (ה) חדשה:** רשימת ה-`SECURITY DEFINER` functions ב-DB נבדקת מול whitelist סגור. פונקציית definer חדשה שלא ב-ADR = build fail. זה ה-control האמיתי, כי דילוג-בעלים הוא בדיוק מה שהפונקציות האלה עושות.
+3. **בדיקת CI (ה):** רשימת ה-`SECURITY DEFINER` functions ב-DB נבדקת מול whitelist סגור. פונקציית definer חדשה שלא ב-ADR = build fail. זה ה-control האמיתי, כי דילוג-בעלים הוא בדיוק מה שהפונקציות האלה עושות.
 
-**Whitelist של `SECURITY DEFINER` functions (סגור):** `app.current_business_ids`, `app.has_role`, `app.create_business`, `app.issue_document`, `app.set_start_number`, `app.send_document`, `app.audit_trigger`. כל תוספת מחייבת עדכון ADR.
+**Whitelist של `SECURITY DEFINER` functions (סגור, 9 פונקציות)** *(עודכן ב-Amendment B)*:
+
+| # | פונקציה | schema | למה definer |
+|---|---|---|---|
+| 1 | `current_business_ids()` | `app` | שוברת רקורסיית RLS על `business_members` |
+| 2 | `has_role(uuid, member_role[])` | `app` | כנ"ל |
+| 3 | `audit_trigger()` | `app` | כותבת ל-`audit_log` שאין לה policy INSERT |
+| 4 | `handle_new_auth_user()` | `public` | רצה בזהות `supabase_auth_admin` שאין לו INSERT על `public.users` |
+| 5 | `create_business(...)` | `public` | אין INSERT policy על `businesses`; bootstrap אטומי (D10) |
+| 6 | `issue_document(uuid, date)` | `public` | כותבת ל-`document_counters` שאין לה policy כתיבה |
+| 7 | `set_start_number(...)` | `public` | כנ"ל |
+| 8 | `send_document(uuid, text[])` | `public` | כותבת אירוע `send` ל-`audit_log` |
+| 9 | `log_event(...)` | `public` | אירועי audit שאינם DML (D11) |
+
+**כלל צמצום:** trigger function שרק **מאמת** ומעלה exception (`app.documents_immutable`, `app.child_rows_locked`, `app.businesses_protect_identity`, `app.audit_log_immutable`) חייבת להיות **`SECURITY INVOKER`** — היא לא כותבת לשום מקום מוגן. אותו דבר לפונקציות עזר שנקראות רק מתוך פונקציית definer אחרת (`app.seed_for`) — הן יורשות את ההקשר ולא צריכות definer משלהן. בדיקת CI (ה) אוכפת: כל `prosecdef` שאינו ב-9 = build fail.
+
+#### D3.3 — חלוקת ה-schemas: `public` = חוזה ה-RPC, `app` = internals *(Amendment B-1, B-2)*
+
+**הבעיה שנמצאה:** PostgREST חושף רק את ה-schemas שמוגדרים ב-`db-schemas` (ברירת מחדל: `public, graphql_public`). פונקציות ב-`app` אינן נגישות דרך `supabase.rpc()` — בסתירה ל-Implementation Notes #1.
+
+**ההכרעה — שתי שכבות מפורשות:**
+
+| schema | תפקיד | נגיש ל-PostgREST | תוכן |
+|---|---|---|---|
+| `public` | **חוזה ה-RPC** — כל מה שהאפליקציה קוראת לו | כן | `create_business`, `issue_document`, `set_start_number`, `send_document`, `log_event`, `handle_new_auth_user` |
+| `app` | **internals** — לעולם לא endpoint | **לא. אף פעם.** | `current_business_ids`, `has_role`, `audit_trigger`, כל trigger functions, `seed_for` |
+
+**למה לא לחשוף את `app` ל-PostgREST** (החלופה שנבחנה ונדחתה) — שני נימוקים בלתי תלויים:
+
+1. **חשיפת schema היא default-open.** כל פונקציה שתתווסף ל-`app` בעתיד תהפוך אוטומטית ל-endpoint ב-HTTP, אלא אם מישהו יזכור `revoke`. זה הפוך מכל עמדה אחרת ב-ADR הזה — whitelist ב-default-deny ב-trigger ה-immutability, רשימה סגורה של service_role, רשימה סגורה של definer. לא נשבור את הקו בשביל נוחות.
+2. **זה מוציא החלטה ביטחונית מחוץ ל-migrations.** `db-schemas` הוא קונפיג של הפרויקט (`config.toml` + דשבורד), לא DDL. הוא לא נוסע עם ה-migrations, לא מכוסה בבדיקות ה-CI, ויכול לסטות בין local/staging/prod בלי שאיש ישים לב. כל שאר מודל האבטחה כאן חי בקבצי migration בדיוק כדי שזה לא יקרה.
+
+**למה `public` ולא wrapper functions ב-`public` שקוראות ל-`app`** (החלופה השלישית): ה-wrapper מכפיל כל חתימה בשני מקומות שחייבים להישאר מסונכרנים, בתמורה לניקיון שמות בלבד. עלות תחזוקה אמיתית מול תועלת קוסמטית.
+
+**הכללים הנגזרים — חובה על כל פונקציה ב-`public`:**
+```sql
+create or replace function public.issue_document(p_document_id uuid, p_issue_date date default null)
+returns public.documents
+language plpgsql security definer set search_path = ''    -- שמות מלאים בגוף
+as $$ ... $$;
+
+revoke execute on function public.issue_document(uuid, date) from public, anon;
+grant  execute on function public.issue_document(uuid, date) to authenticated;
+```
+- `revoke ... from public, anon` ואז `grant ... to authenticated` — **על כל אחת מחמש פונקציות ה-RPC.** בלי זה, `anon` מקבל execute כברירת מחדל של Postgres והפונקציה נגישה ללא התחברות.
+- **המשפט הראשון בגוף כל פונקציית RPC** הוא אימות חברות/תפקיד מפורש (`app.has_role(...)` או שליפת `business_id` מהרשומה ובדיקתה). ה-definer מבטל את ה-RLS — האימות חייב להיות ידני ומפורש.
+
+**`handle_new_auth_user()` נשאר ב-`public`** *(B-1)* — חריג יחיד לכלל "trigger functions ב-`app`", משתי סיבות: (א) זה דפוס Supabase המתועד והמוכר, ו-`supabase_auth_admin` (ה-role שמריץ את ה-INSERT ל-`auth.users`) צריך גישה אליו — הצבה ב-`app` הייתה מוסיפה `grant usage on schema app to supabase_auth_admin` ותלות בהתנהגות פלטפורמה נוספת, בדיוק סוג ההימור שנדחה ב-A-4; (ב) הימצאותו ב-`public` אינה הופכת אותו ל-endpoint — **PostgREST אינו חושף פונקציות שטיפוס ההחזרה שלהן `trigger`**. בנוסף, כחגורה-ושלייקס: `revoke execute on function public.handle_new_auth_user() from public, anon, authenticated`.
+
+דרישות נוספות עליו: `set search_path = ''`, ו-`insert ... on conflict (id) do nothing` כדי שהרצה חוזרת לא תשבור הרשמה.
 
 ### D4 — מודל ההרשאות: 4 roles, אכיפה ב-policy ולא באפליקציה
 
@@ -200,11 +270,7 @@ create policy businesses_update on businesses for update to authenticated
 
 **כלל אכיפה:** כל קריאה עם `service_role` חייבת לשבת תחת `src/server/service-role/`. ESLint rule (`no-restricted-imports`) חוסם import של המודול הזה מכל מקום אחר. `SUPABASE_SERVICE_ROLE_KEY` לעולם לא בקידומת `NEXT_PUBLIC_`.
 
-**מה **לא** עובר ב-service_role, בניגוד לאינטואיציה:**
-- **יצירת עסק** — `app.create_business()` (D10).
-- **המונים והפקת מסמך** — `app.issue_document()` (ADR-INV-002).
-- **audit_log** — `app.audit_trigger()`.
-- **שליחת מייל** — רצה עם ה-JWT של המשתמש.
+**מה **לא** עובר ב-service_role, בניגוד לאינטואיציה:** יצירת עסק (`public.create_business`), המונים וההפקה (`public.issue_document`), audit (`app.audit_trigger` / `public.log_event`), שליחת מייל (`public.send_document`).
 
 פונקציית definer עדיפה על service_role בכל אחד מהמקרים האלה: היא מוגבלת לפעולה אחת מוגדרת, מאמתת חברות בעצמה, ו-`auth.uid()` ממשיך להחזיר את המשתמש האמיתי בתוכה (הוא נקרא מ-GUC של ה-JWT, לא מ-`current_user`) — כך שה-audit נשאר מדויק.
 
@@ -214,13 +280,11 @@ ADR-006 בחר app-layer middleware + triggers כ-defense-in-depth. כאן: **tr
 
 *נימוק:* ב-ERP ה-middleware נדרש כדי לתפוס context שרק האפליקציה מכירה (`on_behalf_of_user_id`, `policy_id` של סוכן AI). כאן אין סוכנים, אין פעולות מטעם, ואין ORM מחייב — לקוח Supabase רגיל עוקף כל middleware של ORM. Trigger ב-DB תופס **כל** נתיב כתיבה כולל SQL Editor ידני ו-service_role. זו הפחתה של שכבה ושל סיכון בו-זמנית.
 
-אירועים שאינם DML (שליחה, הורדה, צפייה ציבורית, ייצוא, הפקת/ביטול מפתח, יצירת עסק) נכתבים ב-INSERT מפורש מהשרת עם `action` ייעודי.
+אירועים שאינם DML (שליחה, הורדה, צפייה ציבורית, ייצוא, הפקת/ביטול מפתח, יצירת עסק) נכתבים דרך `public.log_event()` (D11) או מתוך פונקציית ה-RPC הרלוונטית.
 
 **⚠️ טעון אישור CEO** — סטייה מ-ADR-006.
 
 ### D7 — מפת scoping: לכל טבלה ב-`public` יש עמודת scope מוצהרת *(Amendment A-2, A-5)*
-
-הניסוח הקודם ("רשימה סגורה של טבלאות ללא `business_id`") היה שגוי: הוא התייחס ל-`businesses` כאל חריג גלובלי, בעוד שהיא **הטבלה המבודדת ביותר במערכת** — פשוט לפי `id` ולא לפי `business_id`. הניסוח המתוקן הוא **מפה**, לא רשימה:
 
 | קטגוריה | טבלאות | עמודת scoping | RLS |
 |---|---|---|---|
@@ -231,7 +295,7 @@ ADR-006 בחר app-layer middleware + triggers כ-defense-in-depth. כאן: **tr
 
 **כל טבלה ב-`public` חייבת להשתייך לאחת מארבע הקטגוריות.** קטגוריות 2-4 הן רשימה סגורה; הוספה אליהן מחייבת עדכון ADR.
 
-`_migrations` **הוסרה** מהמסמך: Supabase CLI מנהל היסטוריית migrations ב-`supabase_migrations.schema_migrations`, כלומר ב-schema נפרד שאינו `public` — סינון ה-`nspname = 'public'` בבדיקת ה-CI מוציא אותו ממילא. (אותו דבר נכון ל-`drizzle.__drizzle_migrations` אם ייבחר Drizzle.) אין צורך בחריג.
+`_migrations` **הוסרה** מהמסמך: Supabase CLI מנהל היסטוריית migrations ב-`supabase_migrations.schema_migrations`, ב-schema נפרד שאינו `public` — סינון ה-`nspname = 'public'` בבדיקת ה-CI מוציא אותו ממילא. (אותו דבר נכון ל-`drizzle.__drizzle_migrations` אם ייבחר Drizzle.)
 
 ### D8 — אכיפת "אילו מסמכים מותרים לפי סוג ישות": **CHECK constraint על snapshot בשורת המסמך**
 
@@ -257,12 +321,12 @@ constraint patur_has_no_vat check (
 | חלופה | למה נדחתה |
 |---|---|
 | אכיפה באפליקציה (zod) בלבד | נעקפת ע"י service_role, ע"י SQL ידני, וע"י כל באג בנתיב חדש. מסמך לא-חוקי שהופק = אירוע מס. |
-| Trigger שעושה `SELECT entity_type FROM businesses` | ניתן להשבתה ב-`ALTER TABLE ... DISABLE TRIGGER` (ולו בטעות במהלך תחזוקה); ומסתמך על **המצב הנוכחי** של `businesses` — עוסק פטור שהופך למורשה היה מחליק אחורה על המסמכים ההיסטוריים בכל בדיקה עתידית. |
+| Trigger שעושה `SELECT entity_type FROM businesses` | ניתן להשבתה ב-`ALTER TABLE ... DISABLE TRIGGER`; ומסתמך על **המצב הנוכחי** של `businesses` — עוסק פטור שהופך למורשה היה מחליק אחורה על המסמכים ההיסטוריים בכל בדיקה עתידית. |
 | Composite FK `(business_id, entity_type) → businesses(id, entity_type)` | אלגנטי אך מקבע: העסק לא יוכל **לעולם** לשנות `entity_type` כשקיימים מסמכים (RESTRICT) או יגרור עדכון היסטוריה (CASCADE). שניהם שגויים. |
 
 ה-snapshot פותר את שלושתם: הוא declarative, לא ניתן להשבתה סלקטיבית, והוא הופך את ההיסטוריה ל**מתארת את עצמה** — מסמך משנת 2026 יודע שהוא הופק ע"י עוסק פטור גם אחרי שהעסק עבר למורשה ב-2028.
 
-**שלוש שכבות, סדר עדיפות ברור:** CHECK ב-DB (סמכותי) ← `app.issue_document()` מאמתת שוב עם הודעת שגיאה בעברית ← ה-UI לא מציג טיפוס אסור. השכבות 2-3 הן UX; שכבה 1 היא הביטחון.
+**שלוש שכבות, סדר עדיפות ברור:** CHECK ב-DB (סמכותי) ← `public.issue_document()` מאמתת שוב עם הודעת שגיאה בעברית ← ה-UI לא מציג טיפוס אסור. השכבות 2-3 הן UX; שכבה 1 היא הביטחון.
 
 **מטריצת ההיתרים המלאה:**
 
@@ -281,34 +345,34 @@ constraint patur_has_no_vat check (
 
 *נימוק לברירת המחדל:* רציפות גורפת היא הפרשנות השמרנית של "מספור עוקב" בהוראות ניהול ספרים; איפוס שנתי מייצר שני מסמכים שונים עם אותו מספר. **⚠️ טעון אישור רו"ח.**
 
-### D10 — Bootstrap של עסק: `app.create_business()` ב-`SECURITY DEFINER` *(Amendment A-3)*
+### D10 — Bootstrap של עסק: `public.create_business()` ב-`SECURITY DEFINER` *(Amendment A-3; schema עודכן ב-B-2)*
 
 הצעת ה-EM מאושרת. הפונקציה היא **נתיב הכתיבה היחיד** ל-`businesses`, ו-`INSERT` ל-`business_members` בשורת ה-owner הראשונה מתבצע בתוכה.
 
 ```sql
-create or replace function app.create_business(
+create or replace function public.create_business(
   p_legal_name  text,
-  p_entity_type entity_type,
+  p_entity_type public.entity_type,
   p_tax_id      text,
   p_tax_id_type text default 'vat',
   p_display_name text default null
-) returns businesses
-language plpgsql security definer set search_path = public, pg_temp
+) returns public.businesses
+language plpgsql security definer set search_path = ''
 as $$
-declare v_uid uuid := auth.uid(); v_row businesses; v_count int;
+declare v_uid uuid := auth.uid(); v_row public.businesses; v_count int;
 begin
   if v_uid is null then raise exception 'INV_UNAUTHENTICATED'; end if;
-  if not exists (select 1 from users where id = v_uid) then
-    raise exception 'INV_NO_PROFILE';                     -- פרופיל נוצר ב-trigger על auth.users
+  if not exists (select 1 from public.users where id = v_uid) then
+    raise exception 'INV_NO_PROFILE';                     -- פרופיל נוצר ב-handle_new_auth_user
   end if;
 
-  select count(*) into v_count from businesses where created_by = v_uid;
-  if v_count >= 10 then raise exception 'INV_BUSINESS_LIMIT'; end if;   -- ראה נימוק להלן
+  select count(*) into v_count from public.businesses where created_by = v_uid;
+  if v_count >= 10 then raise exception 'INV_BUSINESS_LIMIT'; end if;
 
   if p_tax_id !~ '^[0-9]{9}$' then raise exception 'INV_BAD_TAX_ID'; end if;
 
   begin
-    insert into businesses (legal_name, display_name, entity_type, tax_id, tax_id_type, created_by)
+    insert into public.businesses (legal_name, display_name, entity_type, tax_id, tax_id_type, created_by)
     values (p_legal_name, coalesce(p_display_name, p_legal_name),
             p_entity_type, p_tax_id, p_tax_id_type, v_uid)
     returning * into v_row;
@@ -316,17 +380,20 @@ begin
     raise exception 'INV_TAX_ID_EXISTS';                  -- מיפוי ידידותי ל-unique(tax_id)
   end;
 
-  insert into business_members (business_id, user_id, role)
+  insert into public.business_members (business_id, user_id, role)
   values (v_row.id, v_uid, 'owner');
 
-  insert into audit_log (business_id, actor_type, actor_id, action, table_name, record_id, after_data)
+  insert into public.audit_log (business_id, actor_type, actor_id, action,
+                                table_name, record_id, after_data)
   values (v_row.id, 'user', v_uid, 'business_create', 'businesses', v_row.id, to_jsonb(v_row));
 
   return v_row;
 end $$;
 
-revoke execute on function app.create_business from public, anon;
-grant  execute on function app.create_business to authenticated;
+revoke execute on function public.create_business(text, public.entity_type, text, text, text)
+  from public, anon;
+grant  execute on function public.create_business(text, public.entity_type, text, text, text)
+  to authenticated;
 ```
 
 **למה RPC ולא policy:**
@@ -335,11 +402,46 @@ grant  execute on function app.create_business to authenticated;
 |---|---|
 | policy `INSERT` על `business_members` בנוסח "החבר הראשון רשאי להוסיף את עצמו" | (א) הזרימה נשברת לשתי קריאות REST נפרדות ללא transaction. כשל בשנייה משאיר **עסק יתום ללא חברים** — בלתי-נראה ל-RLS, בלתי-ניתן לשחזור, ו**שורף את ה-`tax_id` לצמיתות** דרך `unique(tax_id)`. זה השיקול המכריע. (ב) ה-`not exists` שדרוש כדי לחסום self-grant חוזר מפעיל את ה-RLS של `business_members` מתוך policy על אותה טבלה ← רקורסיה. |
 | trigger `AFTER INSERT ON businesses` שיוצר את שורת ה-owner | אטומי, אבל ה-trigger רץ בזהות הקורא ולכן חסום ע"י `bm_manage`; הפיכתו ל-`SECURITY DEFINER` מייצרת דילוג-RLS **סמוי** שנורה בכל INSERT מכל נתיב עתידי. גם לא יכול להחזיר שגיאות ממופות. |
-| endpoint ב-`service_role` | היה מוסיף נתיב service_role רביעי ושובר את הרשימה הסגורה של D5 — בשביל משהו שפונקציית definer צרה עושה טוב יותר. |
+| endpoint ב-`service_role` | היה מוסיף נתיב service_role רביעי ושובר את הרשימה הסגורה של D5. |
 
-**מגבלת 10 עסקים למשתמש:** בהיעדר INSERT policy אין בודק חיצוני, ומשתמש מאומת יכול לקרוא ל-RPC בלולאה. המגבלה היא בלם abuse, לא כלל עסקי; היא מוגדרת כקבוע בקוד הפונקציה וניתנת לשינוי במיגרציה.
+**מגבלת 10 עסקים למשתמש:** בהיעדר INSERT policy אין בודק חיצוני, ומשתמש מאומת יכול לקרוא ל-RPC בלולאה. המגבלה היא בלם abuse, לא כלל עסקי.
 
-**סדר ההקמה המלא** (המשך ב-ADR-INV-003 §D4): `create_business()` מסתיימת בעסק **ללא מפתח חתימה**. ה-route באפליקציה קורא מיד ל-`api/keygen.py`. עד שהמפתח נוצר, `app.issue_document()` מעלה `INV_NO_SIGNING_KEY` וה-UI מציג באנר עם כפתור "נסה שוב". לא מוסיפים עמודת סטטוס לעסק — קיום שורה פעילה ב-`business_signing_keys` הוא מקור האמת היחיד.
+**סדר ההקמה המלא** (המשך ב-ADR-INV-003 §D4): `create_business()` מסתיימת בעסק **ללא מפתח חתימה**. ה-route באפליקציה קורא מיד ל-`api/keygen.py`. עד שהמפתח נוצר, `public.issue_document()` מעלה `INV_NO_SIGNING_KEY` וה-UI מציג באנר עם כפתור "נסה שוב". לא מוסיפים עמודת סטטוס לעסק — קיום שורה פעילה ב-`business_signing_keys` הוא מקור האמת היחיד.
+
+### D11 — `public.log_event()`: אירועי audit שאינם DML, בפונקציה אחת *(Amendment B-4)*
+
+`audit_log` היא ללא policy INSERT במכוון, ולכן **כל** אירוע שאינו DML (הורדה, צפייה, ייצוא, מתן/ביטול הסכמה, אירועי מפתח) היה דורש פונקציית definer ייעודית משלו. בקצב הזה ה-whitelist של D3.2 היה תופח בכל פיצ'ר — ואיתו משטח הסיכון של דילוג-RLS.
+
+**ההחלטה:** פונקציית definer גנרית אחת, עם **רשימת actions סגורה** שמונעת זיוף רשומות DML:
+
+```sql
+create or replace function public.log_event(
+  p_business_id uuid,
+  p_action      text,
+  p_table_name  text default null,
+  p_record_id   uuid default null,
+  p_meta        jsonb default '{}'::jsonb
+) returns void
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if not app.has_role(p_business_id, array['owner','editor','viewer','accountant']::public.member_role[])
+    then raise exception 'INV_FORBIDDEN'; end if;
+
+  if p_action not in ('download','view_public','export',
+                      'consent_grant','consent_revoke','key_create','key_revoke')
+    then raise exception 'INV_BAD_EVENT'; end if;   -- ⬅ insert/update/delete/issue אסורים כאן
+
+  insert into public.audit_log (business_id, actor_type, actor_id, action,
+                                table_name, record_id, after_data)
+  values (p_business_id, 'user', auth.uid(), p_action, p_table_name, p_record_id, p_meta);
+end $$;
+
+revoke execute on function public.log_event(uuid, text, text, uuid, jsonb) from public, anon;
+grant  execute on function public.log_event(uuid, text, text, uuid, jsonb) to authenticated;
+```
+
+שלוש הגנות: אימות חברות מפורש, `actor_id` נכפה מ-`auth.uid()` ולא מפרמטר, ורשימת actions סגורה שאינה כוללת אף פעולת DML — כך שאי אפשר להשתמש בה כדי לזייף "מישהו אחר עדכן את המסמך". פעולות מטעם המערכת (`view_public` מעמוד אנונימי, `sign`) ממשיכות להיכתב ב-service_role, לא כאן.
 
 ---
 
@@ -358,7 +460,9 @@ create table users (
   updated_at   timestamptz not null default now()
 );
 -- RLS: select/update רק על השורה של עצמך (id = auth.uid()).
--- השורה נוצרת ב-trigger על auth.users (דפוס Supabase סטנדרטי) — לא ע"י הלקוח.
+-- השורה נוצרת ב-trigger public.handle_new_auth_user() על auth.users — לא ע"י הלקוח.
+-- (§D3.3: נשאר ב-public; SECURITY DEFINER; search_path=''; on conflict do nothing;
+--  revoke execute from public, anon, authenticated)
 
 create table vat_rates (
   rate         numeric(5,2) not null,
@@ -409,7 +513,7 @@ create unique index businesses_tax_id_uk on businesses (tax_id);   -- ⚠️ ר�
 -- trigger businesses_protect_identity_trg: חוסם שינוי ב-created_by / tax_id / entity_type
 ```
 
-**`unique(tax_id)` הוא בקרה, לא נוחות:** שתי שורות `businesses` לאותה ישות משפטית = שתי סדרות מספור מקבילות לאותו עוסק = הפרה של המספור הרציף. האינדקס הופך את התקלה לבלתי-אפשרית. ה-`unique_violation` ממופה ב-`create_business()` ל-`INV_TAX_ID_EXISTS`.
+**`unique(tax_id)` הוא בקרה, לא נוחות:** שתי שורות `businesses` לאותה ישות משפטית = שתי סדרות מספור מקבילות לאותו עוסק = הפרה של המספור הרציף. ה-`unique_violation` ממופה ב-`create_business()` ל-`INV_TAX_ID_EXISTS`.
 
 ```sql
 create table business_members (
@@ -454,7 +558,7 @@ alter table business_signing_keys force  row level security;   -- ⬅ הטבלה
 -- ⚠️ אין ולא תהיה אף policy. RLS ללא policy = דחייה גורפת.
 --    service_role בלבד, מתוקף BYPASSRLS שגובר על FORCE.
 -- ⚠️ אין audit trigger על הטבלה הזו (כדי לא לשכפל ciphertext ל-audit_log).
---    אירועי מפתח נרשמים ל-audit_log ידנית עם metadata בלבד.
+--    אירועי מפתח נרשמים דרך public.log_event() עם metadata בלבד.
 ```
 
 ### לקוחות, קטלוג, הסכמות
@@ -516,7 +620,7 @@ create unique index consent_active_uk on customer_document_consents (business_id
   where revoked_at is null;
 ```
 
-**ההסכמה היא חלק ממערכת החשבונות** (חוזר מ"ה 24/2004): לכן `consent_text` נשמר כ-snapshot ולא כהפניה לנוסח נוכחי, ולכן השורה immutable פרט ל-`revoked_at`/`revoke_reason`. **כלל אכיפה:** שליחת "מקור" ממוחשב במייל אסורה ללא הסכמה פעילה — נבדק ב-`app.send_document()`; ללא הסכמה, `documents.delivery_mode = 'print'` ו-ה-UI מציע הדפסה.
+**ההסכמה היא חלק ממערכת החשבונות** (חוזר מ"ה 24/2004): לכן `consent_text` נשמר כ-snapshot ולא כהפניה לנוסח נוכחי, ולכן השורה immutable פרט ל-`revoked_at`/`revoke_reason`. **כלל אכיפה:** שליחת "מקור" ממוחשב במייל אסורה ללא הסכמה פעילה — נבדק ב-`public.send_document()`; ללא הסכמה, `documents.delivery_mode = 'print'` ו-ה-UI מציע הדפסה.
 
 ### מסמכים
 
@@ -626,9 +730,9 @@ create index documents_open_idx    on documents (business_id, due_date)
   where status = 'issued' and settled_at is null;             -- aging (Phase 3)
 ```
 
-**`signed_total` כעמודה מחושבת:** זיכויים נשמרים בסכומים **חיוביים** (כך ה-PDF מרונדר טבעית ו-`amounts_non_negative` נשמר), והסימן החשבונאי נגזר בשאילתה. כל דוח הכנסות/מע"מ מסכם `signed_total` ולא `total_amount`. זה מונע את הטעות הקלאסית שבה זיכוי מנפח את ההכנסות.
+**`signed_total` כעמודה מחושבת:** זיכויים נשמרים בסכומים **חיוביים** (כך ה-PDF מרונדר טבעית ו-`amounts_non_negative` נשמר), והסימן החשבונאי נגזר בשאילתה. כל דוח הכנסות/מע"מ מסכם `signed_total` ולא `total_amount`.
 
-**קישור FK מורכב `(parent_document_id, business_id)`:** מונע ברמת ה-DB זיכוי שמצביע על מסמך של עסק אחר. אותו דפוס עבור `customer_id`. זו הגנת multi-tenancy נוספת שאינה תלויה ב-RLS.
+**קישור FK מורכב `(parent_document_id, business_id)`:** מונע ברמת ה-DB זיכוי שמצביע על מסמך של עסק אחר. אותו דפוס עבור `customer_id`. הגנת multi-tenancy שאינה תלויה ב-RLS.
 
 ```sql
 create table document_lines (
@@ -679,7 +783,7 @@ create table payments (
 create index payments_doc_idx on payments (business_id, document_id);
 ```
 
-**אין שמירה של מספר כרטיס מלא, CVV או פרטי חשבון מעבר למינימום.** ב-4 ספרות אחרונות + מספר אישור די לתיעוד הקבלה, והן אינן PCI-scope.
+**אין שמירה של מספר כרטיס מלא, CVV או פרטי חשבון מעבר למינימום.** 4 ספרות אחרונות + מספר אישור מספיקים לתיעוד הקבלה ואינם PCI-scope.
 
 **`on delete cascade`** בטוח כאן דווקא בגלל ADR-INV-002: מסמך שהופק לא ניתן למחיקה (trigger חוסם), ולכן cascade יכול לפעול רק על טיוטות.
 
@@ -701,7 +805,7 @@ create table document_counters (
 alter table document_counters enable row level security;
 create policy counters_read on document_counters for select to authenticated
   using (business_id in (select app.current_business_ids()));
--- ⚠️ אין policy כתיבה. כתיבה רק דרך app.issue_document() ו-app.set_start_number().
+-- ⚠️ אין policy כתיבה. כתיבה רק דרך public.issue_document() ו-public.set_start_number().
 --    בלי FORCE — אחרת הפונקציות עצמן היו נחסמות (D3.2).
 
 create table allocation_requests (                       -- Phase 2; הטבלה נוצרת ב-Phase 0
@@ -764,7 +868,7 @@ create index audit_record_idx  on audit_log (business_id, table_name, record_id,
 create index audit_recent_idx  on audit_log (business_id, occurred_at desc);
 create index audit_actor_idx   on audit_log (business_id, actor_id, occurred_at desc);
 -- RLS: select לחברי העסק; אין policy insert/update/delete כלל.
--- הכתיבה נעשית ע"י app.audit_trigger() (SECURITY DEFINER) — ולכן בלי FORCE (D3.2).
+-- כתיבה: app.audit_trigger() (DML) ו-public.log_event() (לא-DML). ולכן בלי FORCE (D3.2).
 -- trigger audit_log_immutable_trg מעלה exception על כל UPDATE/DELETE, גם ל-service_role.
 ```
 
@@ -775,34 +879,36 @@ create index audit_actor_idx   on audit_log (business_id, actor_id, occurred_at 
 **חיובי**
 - שלוש שכבות בלתי-תלויות מגנות על הבידוד: RLS policy, FK מורכב `(x_id, business_id)`, ובדיקות CI. דליפה דורשת כשל בשלושתן.
 - ה-schema של Phase 3 קיים מ-Phase 0 — כשמגיעים למספר הקצאה ולניכוי במקור, אין migration על טבלה שמכילה מסמכים immutable.
-- `service_role` מצומצם לשלושה נתיבים הניתנים לספירה ולאכיפה ב-lint; דילוג-RLS "לגיטימי" נוסף מרוכז ב-7 פונקציות definer עם whitelist ב-CI. סקירת "מי יכול לעקוף בידוד" היא שתי רשימות סופיות.
-- הפרדת סוגי המסמכים לפי ישות היא declarative ב-schema: הקורא את `documents.sql` רואה את הכלל הרגולטורי.
+- `service_role` מצומצם לשלושה נתיבים; דילוג-RLS "לגיטימי" נוסף מרוכז ב-9 פונקציות definer עם whitelist ב-CI. סקירת "מי יכול לעקוף בידוד" היא שתי רשימות סופיות.
+- **חלוקת ה-schemas (D3.3) הופכת את שאלת "מה נגיש מהאינטרנט" לניתנת לקריאה מהקוד:** מה שב-`public` הוא חוזה, מה שב-`app` אינו קיים כלפי חוץ. אין צורך לבדוק קונפיג של PostgREST כדי לענות.
+- `log_event()` (D11) עוצרת את סחף ה-definer: פיצ'ר חדש שצריך לתעד אירוע לא מוסיף פונקציה מיוחסת חדשה.
+- הפרדת סוגי המסמכים לפי ישות היא declarative ב-schema.
 - `signed_total` הופך את הדוחות (Phase 3) לחסינים בפני טעות הסימן של הזיכויים.
-- כל נתיבי הכתיבה ה"מיוחדים" (יצירת עסק, הפקה, מונים, audit) חולקים דפוס אחד — פונקציית definer צרה עם `revoke ... from public`. אין שני דפוסים מתחרים.
 
 **שלילי / חוב טכני**
-- **הורדת `FORCE`** (Amendment A-4) פירושה שכל פונקציית `SECURITY DEFINER` בבעלות `postgres` מדלגת על RLS. זו התכונה שעליה הארכיטקטורה נשענת, אבל היא גם משטח סיכון: פונקציה עתידית שתיכתב בהיסח הדעת תראה הכול. ה-control היחיד הוא בדיקת CI (ה) — **היא חובה, לא nice-to-have.**
-- `business_id` משוכפל ל-`document_lines` ו-`payments` — denormalization מכוונת (RLS ללא join). ה-FK המורכב מונע חוסר-עקביות, אך יש עמודה "מיותרת" בשתי טבלאות.
-- שני snapshot-ים jsonb פר מסמך — עלות אחסון זניחה בנפח הזה, אבל השאילתות עליהם לא-מאונדקסות (אין צורך: תמיד ניגשים דרך `document_id`).
-- מגבלת 10 עסקים למשתמש היא קבוע בקוד — שינוי דורש migration. מקובל בסדר הגודל הזה.
+- **הורדת `FORCE`** (A-4) פירושה שכל פונקציית `SECURITY DEFINER` בבעלות `postgres` מדלגת על RLS. זו התכונה שעליה הארכיטקטורה נשענת, אבל גם משטח סיכון: פונקציה עתידית שתיכתב בהיסח הדעת תראה הכול. ה-control היחיד הוא בדיקת CI (ה) — **חובה, לא nice-to-have.**
+- **`public` מכיל עכשיו גם טבלאות וגם את חוזה ה-RPC.** כל פונקציה שתתווסף ל-`public` היא endpoint פוטנציאלי; לכן `revoke execute from public, anon` הוא חלק מהגדרת הפונקציה ולא שלב נפרד. בדיקת CI (ו) אוכפת.
+- `business_id` משוכפל ל-`document_lines` ו-`payments` — denormalization מכוונת (RLS ללא join).
+- שני snapshot-ים jsonb פר מסמך — עלות אחסון זניחה בנפח הזה.
+- מגבלת 10 עסקים למשתמש היא קבוע בקוד — שינוי דורש migration.
 - סטייה מ-ADR-006 (triggers-only) פירושה שאם המערכת תתמזג לתוך ה-ERP, שכבת ה-audit תצטרך יישור.
-- `unique(businesses.tax_id)` יחסום תרחיש שאולי לגיטימי (בדיקה/sandbox של אותו עוסק) — פתרון: פרויקט Supabase נפרד ל-staging, לא רכות ב-constraint.
+- `unique(businesses.tax_id)` יחסום sandbox של אותו עוסק — פתרון: פרויקט Supabase נפרד ל-staging.
 
 **השפעה על מודולים אחרים**
-- **ADR-INV-002** נשען על `document_counters`, על ה-snapshots ועל `documents_number_uk`. **Amendment A-4 קריטי עבורו** — בלעדיו `issue_document()` לא הייתה יכולה לכתוב למונים כלל.
-- **ADR-INV-003** נשען על `business_signing_keys` (הטבלה היחידה עם FORCE), `documents.pdf_*`, `document_public_links`.
-- **Phase 3 (מבנה אחיד BKMVDATA)** ידרוש מיפוי של `documents`/`document_lines`/`payments` לרשומות B100/C100/D110/D120 — המבנה שנבחר (שורות + תקבולים כטבלאות נפרדות, snapshot של הלקוח) הוא בדיוק מה שהמבנה האחיד מצפה לו.
+- **ADR-INV-002** נשען על `document_counters`, על ה-snapshots ועל `documents_number_uk`. **A-4 קריטי עבורו**; **B-2 משנה את שם הפונקציה** ל-`public.issue_document()` — ה-ADR ההוא מתייחס אליה כ-`app.issue_document()` ויש לקרוא אותו עם המיפוי הזה.
+- **ADR-INV-003** נשען על `business_signing_keys` (הטבלה היחידה עם FORCE), `documents.pdf_*`, `document_public_links`. אירועי מפתח עוברים ל-`public.log_event()`.
+- **Phase 3 (מבנה אחיד BKMVDATA)** — המבנה שנבחר (שורות + תקבולים כטבלאות נפרדות, snapshot של הלקוח) הוא בדיוק מה שהמבנה האחיד מצפה לו.
 
 ---
 
 ## Reversal Conditions
 
-נחזור ל-ADR הזה אם:
-- **המערכת תיפתח למשתמשים שאינם החבורה** — אז נדרשים: rate limiting, מכסות, בידוד חזק יותר (schema-per-business או פרויקט Supabase נפרד ללקוחות גדולים), ורישום במרשם התוכנות. בנוסף — יש לשקול מחדש את הורדת ה-`FORCE`, ואם `postgres` ב-Supabase יאומת כבעל `BYPASSRLS` בחוזה מתועד, להחזיר FORCE גורף.
+- **המערכת תיפתח למשתמשים שאינם החבורה** — נדרשים rate limiting, מכסות, בידוד חזק יותר, ורישום במרשם התוכנות. בנוסף — לשקול מחדש את הורדת ה-`FORCE`: אם `postgres` ב-Supabase יאומת כבעל `BYPASSRLS` בחוזה מתועד, אפשר להחזיר FORCE גורף.
 - **תתגלה דליפה בין עסקים** — בדיקת יסוד של מודל ה-policy, ומעבר ל-`app.assert_member(business_id)` מפורש בכל RPC.
-- **עסק ישנה `entity_type`** בפועל (פטור→מורשה) — נדרש נוהל מפורש: המסמכים ההיסטוריים נשמרים כפי שהם (ה-snapshot מבטיח זאת), אך יש להכריע אם המונים ממשיכים או מתחילים סדרה חדשה. ה-trigger `businesses_protect_identity_trg` יחסום את השינוי עד שייכתב הנוהל. **צפוי לקרות** — המייסד עשוי לחצות את תקרת הפטור.
-- **יידרש מט"ח** — הסרת `ils_only_phase1` והוספת שער יציג פר מסמך; המבנה כבר תומך.
-- **המערכת תהפוך למודול Billing של SUPER-MESHINE** — יישור מול ADR-002 (`tenant_id`) ו-ADR-006 (audit middleware); ה-many-to-many של `business_members` לא קיים ב-ADR-002 ויחייב עדכון שלו.
+- **עסק ישנה `entity_type`** בפועל (פטור→מורשה) — נדרש נוהל מפורש; ה-trigger `businesses_protect_identity_trg` יחסום עד שייכתב. **צפוי לקרות.**
+- **יידרש מט"ח** — הסרת `ils_only_phase1` והוספת שער יציג פר מסמך.
+- **`public` יתפח מעבר ל-~10 פונקציות RPC** — אז שווה לשקול מחדש את דפוס ה-wrapper (schema `api` ייעודי שנחשף, עם internals ב-`app` ו-`public` לטבלאות בלבד).
+- **המערכת תהפוך למודול Billing של SUPER-MESHINE** — יישור מול ADR-002 ו-ADR-006.
 
 ---
 
@@ -810,43 +916,38 @@ create index audit_actor_idx   on audit_log (business_id, actor_id, occurred_at 
 
 | # | ההחלטה | למה זה לא בסמכות הארכיטקט |
 |---|---|---|
-| A1 | `credit_note` יחיד גם לזיכוי קבלה (במקום "קבלת זיכוי" נפרדת) | פרשנות חשבונאית — **חוות דעת רו"ח** |
-| A2 | מספור `continuous` בין שנות מס (ולא איפוס שנתי) | פרשנות "מספור עוקב" — **חוות דעת רו"ח** |
+| A1 | `credit_note` יחיד גם לזיכוי קבלה | פרשנות חשבונאית — **חוות דעת רו"ח** |
+| A2 | מספור `continuous` בין שנות מס | פרשנות "מספור עוקב" — **חוות דעת רו"ח** |
 | A3 | `unique(businesses.tax_id)` — עסק אחד לכל ח.פ במערכת | החלטה מוצרית עם השלכה תפעולית |
-| A4 | סטייה מ-ADR-006: audit ב-triggers בלבד, ללא app middleware | חריגה מ-ADR מאושר של הבית |
-| A5 | אחסון PII של לקוחות צד ג' (שם, ת.ז/ע.מ, כתובת) של עסקים שאינם של המייסד | **חוק הגנת הפרטיות תיקון 13** (בתוקף מ-2025) — חובות מנהל מאגר. שאלה משפטית, לא ארכיטקטונית |
-| A6 | `viewer`/`accountant` נכנסים ל-enum מ-Phase 0 אף שהמסכים ב-Phase 3 | קטן, אך משנה scope של Phase 0 |
+| A4 | סטייה מ-ADR-006: audit ב-triggers בלבד | חריגה מ-ADR מאושר של הבית |
+| A5 | אחסון PII של לקוחות צד ג' | **חוק הגנת הפרטיות תיקון 13** — שאלה משפטית |
+| A6 | `viewer`/`accountant` ב-enum מ-Phase 0 | משנה scope של Phase 0 |
 
-*Amendment A לא הוסיף החלטות הטעונות אישור — כל ארבעת התיקונים הם תיקוני נכונות בתוך סמכות הארכיטקט.*
+*Amendments A ו-B לא הוסיפו החלטות הטעונות אישור — כולם תיקוני נכונות בסמכות הארכיטקט.*
 
 ---
 
 ## Implementation Notes
 
-1. **סדר ה-migrations ב-Phase 0** — `0001_extensions` (`pgcrypto`, `citext`) → `0002_enums` → `0003_core_tables` → `0004_rls_helpers` (schema `app` + definer functions) → `0005_rls_policies` (כולל D3.1 ו-FORCE על `business_signing_keys` בלבד) → `0006_audit` (trigger function + החלה על כל טבלה) → `0007_immutability` (ADR-INV-002) → `0008_issue_function` (ADR-INV-002) → **`0009_create_business`** (D10) → `0010_storage_buckets` (ADR-INV-003) → `0011_seed_vat_rates`. לכל migration קובץ `down` מקביל (invariant #4).
+1. **סדר ה-migrations ב-Phase 0** — `0001_extensions` (`pgcrypto`, `citext`) → `0002_enums` → `0003_core_tables` → `0004_rls_helpers` (schema `app` + שתי פונקציות ה-policy + **ה-grants של B-3**) → `0005_rls_policies` (כולל D3.1 ו-FORCE על `business_signing_keys` בלבד) → `0006_auth_sync` (`public.handle_new_auth_user` + trigger על `auth.users`) → `0007_audit` (`app.audit_trigger` + החלה על כל טבלה) → `0008_immutability` (ADR-INV-002) → `0009_issue_function` (`public.issue_document`, `public.set_start_number`) → `0010_create_business` (`public.create_business`) → `0011_log_event` (`public.log_event`) → `0012_storage_buckets` (ADR-INV-003) → `0013_seed_vat_rates`. לכל migration קובץ `down` מקביל (invariant #4).
 
-2. **בדיקות CI חוסמות merge** — חמש שאילתות מטא נגד DB זמני שעליו הורצו כל ה-migrations:
+2. **בדיקות CI חוסמות merge** — שש שאילתות מטא נגד DB זמני שעליו הורצו כל ה-migrations:
 
    ```sql
    -- (א) טבלה ב-public ללא RLS מופעל
    select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;
 
-   -- (ב) FORCE מוחל בדיוק על business_signing_keys ועל שום טבלה אחרת  [Amendment A-4]
+   -- (ב) FORCE מוחל בדיוק על business_signing_keys ועל שום טבלה אחרת  [A-4]
    select c.relname, c.relforcerowsecurity
    from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public' and c.relkind = 'r'
      and c.relforcerowsecurity <> (c.relname = 'business_signing_keys');
 
-   -- (ג) scoping: כל טבלה חייבת business_id, אלא אם היא במפת החריגים  [Amendment A-2]
-   with expected(relname, scoping_column) as (values
-     ('businesses','id'),      -- scope-root
-     ('users','id'),           -- self-scoped
-     ('vat_rates',null)        -- reference data גלובלי
-   )
+   -- (ג) scoping: כל טבלה חייבת business_id, אלא אם היא במפת החריגים  [A-2]
+   with expected(relname) as (values ('businesses'), ('users'), ('vat_rates'))
    select c.relname
-   from pg_class c
-   join pg_namespace n on n.oid = c.relnamespace
+   from pg_class c join pg_namespace n on n.oid = c.relnamespace
    left join expected e on e.relname = c.relname
    where n.nspname = 'public' and c.relkind = 'r' and e.relname is null
      and not exists (select 1 from pg_attribute a
@@ -855,35 +956,47 @@ create index audit_actor_idx   on audit_log (business_id, actor_id, occurred_at 
 
    -- (ד) טבלה עם business_id ללא audit trigger (פרט ל-business_signing_keys ו-audit_log)
 
-   -- (ה) SECURITY DEFINER functions מול whitelist סגור  [Amendment A-4]
+   -- (ה) SECURITY DEFINER functions מול whitelist סגור — 9 פונקציות  [A-4, עודכן ב-B-1/B-4]
    select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where p.prosecdef and n.nspname in ('public','app')
      and p.oid::regprocedure::text not in (
        'app.current_business_ids()',
        'app.has_role(uuid,member_role[])',
-       'app.create_business(text,entity_type,text,text,text)',
-       'app.issue_document(uuid,date)',
-       'app.set_start_number(uuid,document_type,integer,bigint)',
-       'app.send_document(uuid,text[])',
-       'app.audit_trigger()');
+       'app.audit_trigger()',
+       'public.handle_new_auth_user()',
+       'public.create_business(text,entity_type,text,text,text)',
+       'public.issue_document(uuid,date)',
+       'public.set_start_number(uuid,document_type,integer,bigint)',
+       'public.send_document(uuid,text[])',
+       'public.log_event(uuid,text,text,uuid,jsonb)');
+
+   -- (ו) אף פונקציית RPC אינה נגישה ל-anon  [B-2]
+   select p.oid::regprocedure
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f' and p.prorettype <> 'trigger'::regtype
+     and has_function_privilege('anon', p.oid, 'execute');
    ```
-   כל שאילתה שמחזירה שורות ⇒ build fail. שים לב ש-(א)-(ה) מסננות `nspname = 'public'` ולכן `supabase_migrations.schema_migrations` אינה נכללת — אין צורך בחריג עבורה *(Amendment A-5)*.
+   כל שאילתה שמחזירה שורות ⇒ build fail. הסינון `nspname = 'public'` מוציא את `supabase_migrations.schema_migrations` ממילא *(A-5)*.
 
-3. **בדיקת בידוד אמיתית ב-DoD של Phase 0** (לא רק "RLS מופעל"): שני משתמשים, שני עסקים, ואז assertions — SELECT/INSERT/UPDATE/DELETE של user A על כל אחת מטבלאות user B, כולל ניסיון INSERT ל-`documents` עם `business_id` של B, וכולל **ניסיון `SELECT`/`UPDATE` ישיר על `businesses` של B**. כולן חייבות להיכשל. בנוסף שלוש בדיקות חדשות *(Amendment A)*:
-   - `INSERT INTO businesses` ישיר מלקוח `authenticated` ⇒ נכשל (אין policy).
-   - `DELETE FROM businesses` ⇒ נכשל.
-   - `app.create_business()` מוצלחת ⇒ נוצרו **שתי** שורות (עסק + owner) ו-`current_business_ids()` מחזירה מיד את העסק החדש. כשל מלאכותי אחרי ה-INSERT הראשון ⇒ **אפס** שורות נותרו ו-ה-`tax_id` פנוי לניסיון חוזר.
+3. **אימות תפעולי חד-פעמי ב-B13 (לא בדיקת CI):** לוודא שב-`config.toml` של Supabase, `[api] schemas` **אינו** כולל `app`. תיעוד בהערה בקובץ הקונפיג עם הפניה ל-§D3.3. זו נקודת ה-drift היחידה שאינה מכוסה ב-migrations *(B-2)*.
 
-4. **`updated_at`** — extension `moddatetime` על טבלאות עריכות (`businesses`, `customers`, `items`) ועל `documents` **רק בסטטוס draft** (ה-trigger של ADR-INV-002 מטפל בשאר).
+4. **בדיקת בידוד אמיתית ב-DoD של Phase 0:** שני משתמשים, שני עסקים, ואז assertions — SELECT/INSERT/UPDATE/DELETE של user A על כל אחת מטבלאות user B, כולל ניסיון INSERT ל-`documents` עם `business_id` של B, וניסיון SELECT/UPDATE ישיר על `businesses` של B. כולן חייבות להיכשל. בנוסף:
+   - `INSERT INTO businesses` ישיר מלקוח `authenticated` ⇒ נכשל; `DELETE FROM businesses` ⇒ נכשל *(A-1)*.
+   - `create_business()` מוצלחת ⇒ שתי שורות (עסק + owner), ו-`current_business_ids()` מחזירה מיד את העסק. כשל מלאכותי אחרי ה-INSERT הראשון ⇒ אפס שורות ו-`tax_id` פנוי *(A-3)*.
+   - **`supabase.rpc('issue_document', ...)` מלקוח `authenticated` מחזירה 200** — הבדיקה שהייתה תופסת את B-2. ובמקביל `supabase.rpc('current_business_ids')` מחזירה 404 (אינה חשופה) *(B-2)*.
+   - **`select * from customers` מלקוח `authenticated` לא מחזירה `permission denied for schema app`** — הבדיקה שהייתה תופסת את B-3 *(B-3)*.
+   - `log_event()` עם `p_action='update'` ⇒ `INV_BAD_EVENT`; עם `business_id` של עסק זר ⇒ `INV_FORBIDDEN` *(B-4)*.
 
-5. **Audit trigger** — פונקציה אחת `app.audit_trigger()` (`SECURITY DEFINER`) שקוראת `auth.uid()`, `current_setting('request.jwt.claims', true)` ל-email, ו-`current_setting('app.request_id', true)`. מוחלת על כל טבלה עם `business_id` **פרט ל-`business_signing_keys` ו-`audit_log`**, וכן על `businesses` (scope-root). helper `app.enforce_audit(regclass)` + בדיקת CI (ד).
+5. **`updated_at`** — extension `moddatetime` על `businesses`, `customers`, `items`, ועל `documents` **רק בסטטוס draft** (ה-trigger של ADR-INV-002 מטפל בשאר).
 
-6. **חישוב הכספים סמכותי ב-DB.** האפליקציה מחשבת לתצוגה חיה; `app.issue_document()` **מחשבת מחדש** את כל שדות הסכום מתוך `document_lines` ודורסת. לקוח לא יכול להפיק מסמך עם סכומים שגויים גם אם ישלח אותם. עיגול: `round(x, 2)` half-up בכל שלב שורה, וסכימה של שורות מעוגלות (לא עיגול של סכום) — כדי שהמסמך המודפס יסתכם בדיוק.
+6. **Audit trigger** — `app.audit_trigger()` (`SECURITY DEFINER`, `search_path=''`) קוראת `auth.uid()`, `current_setting('request.jwt.claims', true)` ל-email, ו-`current_setting('app.request_id', true)`. מוחלת על כל טבלה עם `business_id` **פרט ל-`business_signing_keys` ו-`audit_log`**, וכן על `businesses`. helper `app.enforce_audit(regclass)` + בדיקת CI (ד).
 
-7. **`app.set_start_number(business_id, type, tax_year, n)`** — מאפשר להתחיל ממספר קיים במעבר מ-Morning. `SECURITY DEFINER`, מותרת **רק** כש-`next_number = start_number` (טרם הופק מסמך בסדרה) ורק ל-`owner`. כותבת audit_log.
+7. **חישוב הכספים סמכותי ב-DB.** האפליקציה מחשבת לתצוגה חיה; `public.issue_document()` **מחשבת מחדש** את כל שדות הסכום מתוך `document_lines` ודורסת. עיגול: `round(x, 2)` half-up בכל שורה, וסכימה של שורות מעוגלות.
 
-8. **Storage RLS** — ב-`0010`: bucket `documents` פרטי, policy SELECT בלבד ל-`authenticated` לפי `(storage.foldername(name))[1]::uuid in (select app.current_business_ids())`; **ללא policy** INSERT/UPDATE/DELETE — העלאה רק ב-service_role מצינור ההפקה. bucket `business-assets` (לוגו): SELECT + INSERT ל-`owner` של אותו עסק.
+8. **`public.set_start_number(business_id, type, tax_year, n)`** — מעבר מ-Morning. `SECURITY DEFINER`, מותרת **רק** כש-`next_number = start_number` ורק ל-`owner`. כותבת audit_log.
 
-9. **`SUPABASE_SERVICE_ROLE_KEY`** — ב-Vercel Environment Variables בלבד, מסומן Sensitive, ולא ב-Preview environments של PR-ים מפורקים. סיבוב מיידי אם דלף.
+9. **Storage RLS** — bucket `documents` פרטי, policy SELECT בלבד ל-`authenticated` לפי `(storage.foldername(name))[1]::uuid in (select app.current_business_ids())`; **ללא policy** INSERT/UPDATE/DELETE. bucket `business-assets` (לוגו): SELECT + INSERT ל-`owner` של אותו עסק.
 
-10. **`app.create_business()` — הערות ל-builder** *(Amendment A-3)*: הפונקציה מוחזרת ללקוח דרך `supabase.rpc('create_business', {...})`. ה-route ב-Next.js קורא לה, ואז — **אחרי** שהיא החזירה בהצלחה — קורא ל-`api/keygen.py`. אין לאחד את שני השלבים לפונקציה אחת (קריאת HTTP מתוך Postgres). כשל ב-keygen משאיר עסק תקין ללא יכולת הפקה — מצב מטופל, לא מצב שבור.
+10. **`SUPABASE_SERVICE_ROLE_KEY`** — ב-Vercel Environment Variables בלבד, מסומן Sensitive, ולא ב-Preview environments של PR-ים מפורקים.
+
+11. **`public.create_business()` — הערות ל-builder** *(A-3)*: נקראת דרך `supabase.rpc('create_business', {...})`. ה-route ב-Next.js קורא לה, ואז — **אחרי** שהיא החזירה בהצלחה — קורא ל-`api/keygen.py`. אין לאחד את שני השלבים (קריאת HTTP מתוך Postgres). כשל ב-keygen משאיר עסק תקין ללא יכולת הפקה — מצב מטופל, לא מצב שבור.
