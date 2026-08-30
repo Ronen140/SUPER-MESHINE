@@ -31,6 +31,7 @@ import dataclasses
 import datetime
 import hashlib
 import os
+import uuid
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -165,9 +166,11 @@ def create_signing_key_record(
 ) -> dict:
     """Builds the full row to INSERT into `public.business_signing_keys` (ADR-INV-001
     schema) — generates the keypair, builds and self-signs the certificate, envelope-encrypts
-    the private key, and returns exactly the columns that table has. Never returns (or logs,
-    or holds onto past its own stack frame any longer than necessary) the raw private key —
-    only its ciphertext."""
+    the private key, and returns exactly the columns that table has, plus a client-generated
+    `id` (0017_log_event_revert.sql: `api/keygen.py` needs the row's own id up front to write
+    `audit_log.record_id` for the direct-insert 'key_create' event, before any network round
+    trip). Never returns (or logs, or holds onto past its own stack frame any longer than
+    necessary) the raw private key — only its ciphertext."""
     private_key = generate_rsa_keypair()
     certificate = build_self_signed_certificate(private_key, legal_name=legal_name, tax_id=tax_id)
 
@@ -183,6 +186,7 @@ def create_signing_key_record(
     fingerprint_sha256 = hashlib.sha256(certificate_der).digest()
 
     return {
+        "id": str(uuid.uuid4()),
         "business_id": business_id,
         "algorithm": "RSA-3072",
         "certificate_pem": certificate_pem,

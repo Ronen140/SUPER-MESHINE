@@ -126,6 +126,24 @@ def test_create_signing_key_record_never_includes_the_raw_private_key():
     assert "BEGIN RSA PRIVATE" not in serialized
 
 
+def test_create_signing_key_record_includes_a_generated_id():
+    """0017_log_event_revert.sql: api/keygen.py now inserts the audit_log row for a
+    'key_create' event directly (as service_role) instead of calling public.log_event() —
+    it needs the row's own id up front (before the INSERT response is parsed) to use as
+    audit_log.record_id. Generated client-side rather than round-tripping the INSERT
+    response, so it is deterministic and available before any network call is made."""
+    import uuid
+
+    record = create_signing_key_record(
+        business_id="11111111-1111-1111-1111-111111111111",
+        legal_name="Acme Co",
+        tax_id="123456789",
+        kek=TEST_KEK,
+        kek_id="test-v1",
+    )
+    assert uuid.UUID(record["id"]).version == 4
+
+
 def test_create_signing_key_record_certificate_serial_and_fingerprint_are_populated():
     record = create_signing_key_record(
         business_id="11111111-1111-1111-1111-111111111111",

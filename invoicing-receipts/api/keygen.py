@@ -17,13 +17,15 @@ was added for this — flagged here for visibility, not silently decided: if a r
 Python client is wanted later, that is a new dependency requiring approval first.
 
 code-quality review (Batch 3, 🔴): the INSERT above wrote no audit_log row at all — a direct
-violation of CLAUDE.md invariant #2. Fixed by calling `public.log_event()`
-(`0016_log_event_and_fixes.sql`) right after a successful INSERT, via `POST
-.../rest/v1/rpc/log_event` with the same service_role key. `log_event()` was extended
-specifically to accept a service_role-authenticated call (no `auth.uid()` to check
-membership against) and record it with `actor_type='service'` — see that migration's header
-comment. A `log_event` failure is logged server-side but does *not* fail this request: the
-signing key itself was already durably written by the time it runs.
+violation of CLAUDE.md invariant #2. `0016_log_event_and_fixes.sql` first fixed this by
+calling `public.log_event()` via `POST .../rest/v1/rpc/log_event`, extended to accept a
+service_role-authenticated call. The architect reverted that extension
+(`0017_log_event_revert.sql`): `service_role` already has `BYPASSRLS` and can INSERT into
+`public.audit_log` directly with zero policy involvement — exactly like
+`public.create_business()` already does for `'business_create'` events — so this now writes
+the audit_log row directly (`POST .../rest/v1/audit_log`, same service_role key) instead of
+calling the RPC. A failure writing that row is logged server-side but does *not* fail this
+request: the signing key itself was already durably written by the time it runs.
 """
 
 from __future__ import annotations
@@ -96,17 +98,25 @@ def _insert_signing_key(record: dict, *, supabase_url: str, service_role_key: st
 def _log_key_create_event(
     record: dict, *, supabase_url: str, service_role_key: str
 ) -> None:
-    """Calls public.log_event() (0016_log_event_and_fixes.sql) via PostgREST's RPC endpoint,
-    as service_role. Never raises — a failure here is logged server-side (ADR-INV-003 §D4's
-    own logging rule: never key material) rather than surfaced to the caller, since the
-    signing key itself is already durably written by the time this runs."""
+    """Writes the 'key_create' audit_log row directly (0017_log_event_revert.sql: the
+    architect rejected the public.log_event() service_role extension — service_role already
+    has BYPASSRLS and can INSERT into audit_log directly, exactly like
+    public.create_business() already does for 'business_create' events), as service_role.
+    `record["id"]` (generated client-side by create_signing_key_record — see that function's
+    docstring) becomes audit_log.record_id, so the audit row references the actual
+    business_signing_keys row without a round trip to read it back. Never raises — a failure
+    here is logged server-side (ADR-INV-003 §D4's own logging rule: never key material) rather
+    than surfaced to the caller, since the signing key itself is already durably written by
+    the time this runs."""
     body = json.dumps(
         {
-            "p_business_id": record["business_id"],
-            "p_action": "key_create",
-            "p_table_name": "business_signing_keys",
-            "p_record_id": None,
-            "p_meta": {
+            "business_id": record["business_id"],
+            "actor_type": "service",
+            "actor_id": None,
+            "action": "key_create",
+            "table_name": "business_signing_keys",
+            "record_id": record["id"],
+            "after_data": {
                 "certificate_serial": record["certificate_serial"],
                 "kek_id": record["kek_id"],
             },
@@ -114,13 +124,14 @@ def _log_key_create_event(
     ).encode("utf-8")
 
     request = urllib.request.Request(
-        f"{supabase_url}/rest/v1/rpc/log_event",
+        f"{supabase_url}/rest/v1/audit_log",
         data=body,
         method="POST",
         headers={
             "apikey": service_role_key,
             "Authorization": f"Bearer {service_role_key}",
             "Content-Type": "application/json",
+            "Prefer": "return=minimal",
         },
     )
     try:
@@ -128,8 +139,8 @@ def _log_key_create_event(
             pass
     except (urllib.error.HTTPError, urllib.error.URLError):
         _logger.exception(
-            "log_event(key_create) failed for business %s — the signing key itself was "
-            "still created successfully",
+            "audit_log insert for key_create failed for business %s — the signing key "
+            "itself was still created successfully",
             record["business_id"],
         )
 
