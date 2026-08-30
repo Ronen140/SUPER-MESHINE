@@ -305,3 +305,16 @@
 - **Verified (בפועל):** 4 טסטים חדשים מפורשים (`tests/amendment-c.test.ts`) — INSERT **וגם** UPDATE על `document_lines` כ-`authenticated` אמיתי (בלי `issue_document` ב-stack) מחשבים נכון; קריאה ישירה ל-`app.compute_line()` כ-`authenticated` מצליחה; קריאה ישירה ל-`app.business_has_signing_key()` כ-`authenticated` עדיין נכשלת (`permission denied`) — מוכיח ש-USAGE לא "פותח" את כל ה-schema, רק EXECUTE הנקודתי קובע. Roundtrip מלא 0001→0015 (down+up) דרך `scripts/migrate-down-up-roundtrip.sh`; **8/8** בדיקות CI עוברות; `pnpm test` — **118/118** (כולל עבודת F3 מקבילה של frontend-builder, לא נגעתי בה).
 - **Notes / Caveats:** `scripts/ci-schema-checks.sql`'s whitelist (ה) — 10 פונקציות — עכשיו **מאושר במלואו** ע"י Amendment C-2 (לא "pending" יותר). לא בוצע commit/push.
 - **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]]
+
+### 2026-08-30 — ADR-INV-001 Amendment C: two production-breaking bugs confirmed, one fix redirected [done]
+*(רשומת הארכיטקט — נכתבה ע"י ה-CEO בשמו; הכתיבה המקורית שלו אבדה בהתנגשות עם סוכן אחר.)*
+- **What was done:** שלושת ממצאי Batch 3 (`9ba0668`) הוכרעו. ADR-INV-001 עודכן במקום (Amended: A, B, C) — §D3 (grants), §D3.2 (whitelist 9→10 + תיקון נימוק ה-FORCE), §D3.3 (חידוד), §D5, ובדיקות CI 7→8.
+- **Decisions:**
+  - **C-2 — אושר במלואו, וזה היה באג של הארכיטקט.** ב-Amendment A §D3.2 נכתב ש-`business_signing_keys` היא החריג הנכון ל-FORCE "משום שאף definer אינה נוגעת בה" — בעוד ש-ADR-INV-002 §D2 שלב 5 כבר דרש מ-`issue_document()` לבדוק מפתח פעיל. סתירה בין שני ADRs באותו יום, שנבלעה בשלושה סבבי אימות כי כולם רצו כ-superuser. `app.business_has_signing_key(uuid)` בבעלות `service_role` מאושרת; whitelist → **10**.
+  - **C-1 — הבאג אושר, התיקון נדחה.** `compute_line` חוזרת ל-`app`; במקומה `grant usage on schema app to authenticated` + EXECUTE נקודתי. הארכיטקט ביטל איסור שכתב בעצמו ב-B-3 — הנימוק נכשל פעמיים על המכונה שלנו עצמה. USAGE אינו שער אבטחה (לא מסתיר שמות, לא פותח נתיב HTTP, אין SQL חופשי ל-`authenticated`); `public.compute_line()` לעומת זאת שובר את "מה שב-`public` הוא חוזה ה-API" ויוצר תקדים שיחזור.
+  - **C-3 — אושר.** check (ז) הורחבה ל-`anon` ול-allowlist של שלוש; נוספה מניעה ב-`alter default privileges`.
+- **Notes / Caveats:**
+  - **הלקח המתודולוגי הוא הממצא החשוב בסבב:** שדרוג ה-harness ל-`db_owner` לא-superuser הוא מה שהפך את C-2 לגלוי. בדיקה כ-superuser אינה ראיה לכלום בענייני RLS — נוסף כדרישה קבועה (§IN#3).
+  - C-1, C-2 ו-A-4 הם אותה משפחה: הנחה על מי מדלג על RLS, שנבדקה בסביבה סלחנית מדי.
+  - migration `0015_amendment_c` יושמה ואומתה (ראה הרשומה הקודמת). Amendment C לא הוסיף החלטות הטעונות אישור CEO. אין escalation פתוח.
+- **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]], [[002-immutability-and-numbering]]
