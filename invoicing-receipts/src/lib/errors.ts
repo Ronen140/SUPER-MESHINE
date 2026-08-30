@@ -47,7 +47,7 @@ export const INV_ERROR_MESSAGES: Record<string, string> = {
   INV_CREDIT_OF_CREDIT: "לא ניתן להפיק מסמך זיכוי כנגד מסמך זיכוי אחר.",
   INV_CREDIT_EXCEEDS_PARENT: "סכום הזיכוי חורג מהיתרה שנותרה במסמך האב.",
   INV_PAYMENTS_MISMATCH: "סכום התקבולים אינו תואם את הסכום לתשלום במסמך.",
-  INV_NO_VAT_RATE: "לא נמצא שיעור מע\"מ בתוקף לתאריך ההפקה.",
+  INV_NO_VAT_RATE: 'לא נמצא שיעור מע"מ בתוקף לתאריך ההפקה.',
   INV_NO_SIGNING_KEY: "לעסק אין מפתח חתימה פעיל — לא ניתן להפיק מסמכים כרגע.",
 
   // app.set_start_number() (0008_issue_function.sql, ADR-INV-001 Implementation Notes #7)

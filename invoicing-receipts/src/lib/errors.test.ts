@@ -21,13 +21,17 @@ describe("toUserMessage", () => {
   });
 
   it("falls back to a generic Hebrew message for a raw Postgres error with no INV_* code", () => {
-    expect(toUserMessage('duplicate key value violates unique constraint "customers_taxid_uk"')).toBe(
-      "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",
-    );
+    expect(
+      toUserMessage('duplicate key value violates unique constraint "customers_taxid_uk"'),
+    ).toBe("אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.");
   });
 
   it("falls back to a generic Hebrew message for null/undefined input", () => {
-    expect(toUserMessage(null)).toBe("אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.");
-    expect(toUserMessage(undefined)).toBe("אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.");
+    expect(toUserMessage(null)).toBe(
+      "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",
+    );
+    expect(toUserMessage(undefined)).toBe(
+      "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",
+    );
   });
 });
