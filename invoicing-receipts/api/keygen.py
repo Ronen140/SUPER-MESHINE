@@ -29,6 +29,7 @@ signing key itself was already durably written by the time it runs.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
@@ -37,6 +38,8 @@ from http.server import BaseHTTPRequestHandler
 from _keygen_core import create_signing_key_record, kek_from_env
 
 _REQUIRED_FIELDS = ("business_id", "legal_name", "tax_id")
+
+_logger = logging.getLogger("keygen")
 
 
 class KeygenError(Exception):
