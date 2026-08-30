@@ -2,18 +2,18 @@
 
 ## Overview
 
-פרויקט חדש שהמייסד ביקש לפתוח: מערכת חשבוניות וקבלות **רב-עסקית** למייסד ולחבריו — מספר עסקים נפרדים (עוסק פטור + עוסק מורשה לפחות) במערכת אחת, חינמית לתפעול. ליבה: קבלות לעוסק פטור, חשבונית מס / מס-קבלה / זיכוי לעוסק מורשה, קטלוג פריטי עבודה עם סכום פתוח עד הפקה, מצב טיוטה→הפקה עם נעילה ומספור רציף, ייצוא לרו"ח. נפח צפוי זעום (~2 מסמכים/חודש לעסק). הפרויקט יושב ב-`invoicing-receipts/` בשורש הריפו (מחוץ ל-pnpm workspace). תוכנית פיתוח מלאה ב-`docs/plan.md`; **הארכיטקטורה נקבעה ב-3 ADRs ב-`invoicing-receipts/docs/adr/`** (ADR-INV-001/002/003), כולם **Accepted** (2026-08-30, CEO, ע"פ מנדט המייסד ל-Phase 0 build; 17 פריטים A/B/C דורשים חוו"ד רו"ח/מייסד לפני production אך אינם חוסמים בנייה). **Engineering plan ל-Phase 0 נכתב** ע"י engineering-manager: `vault/Engineering/invoicing-phase-0-plan.md` — 13 subtasks ל-backend-builder (scaffold, schema מלא, RLS, audit, immutability, `issue_document()`, יצירת מפתח חתימה, buckets, גיבוי חוץ) + 4 subtasks ל-frontend-builder (שלד app מינימלי, auth, יצירת עסק, business switcher — עורך המסמכים/דשבורד/PDF נשארים Phase 1). עדיין אין קוד — הפיתוח בפועל טרם החל.
+פרויקט חדש שהמייסד ביקש לפתוח: מערכת חשבוניות וקבלות **רב-עסקית** למייסד ולחבריו — מספר עסקים נפרדים (עוסק פטור + עוסק מורשה לפחות) במערכת אחת, חינמית לתפעול. ליבה: קבלות לעוסק פטור, חשבונית מס / מס-קבלה / זיכוי לעוסק מורשה, קטלוג פריטי עבודה עם סכום פתוח עד הפקה, מצב טיוטה→הפקה עם נעילה ומספור רציף, ייצוא לרו"ח. נפח צפוי זעום (~2 מסמכים/חודש לעסק). הפרויקט יושב ב-`invoicing-receipts/` בשורש הריפו (מחוץ ל-pnpm workspace). תוכנית פיתוח מלאה ב-`docs/plan.md`; **הארכיטקטורה נקבעה ב-3 ADRs ב-`invoicing-receipts/docs/adr/`** — ADR-INV-001 **Accepted (amended)**, ADR-INV-002 ו-003 Proposed. Phase 0 בביצוע לפי `vault/Engineering/invoicing-phase-0-plan.md`.
 
 ## Open Questions
 
-- **⚠️ פער ב-ADR-INV-001 שחוסם 2 מתוך 17 subtasks של Phase 0 (זוהה ע"י engineering-manager, 2026-08-30):** אין RLS policy מוגדרת לטבלת `businesses` עצמה; סתירה בבדיקת ה-CI של D7 (`businesses` חסרת `business_id` ולא ברשימה הסגורה); ובעיית ביצה-ותרנגולת ב-`bm_manage` policy — אין מנגנון bootstrap ל-owner ראשון ב-`business_members` בעת יצירת עסק חדש. דורש תשובת ארכיטקט לפני שמתחילים את subtask "יצירת עסק + מפתח חתימה" (B9/F3 בתוכנית ה-Phase 0). פירוט מלא ב-[[invoicing-phase-0-plan]] §Escalation.
-- **אישור 17 ההחלטות המסומנות ב-ADRs** (A1-A6, B1-B4, C1-C7) — מתוכן 6 דורשות **חוות דעת רו"ח** לפני production: זיכוי יחיד גם לקבלות (A1), מספור continuous בין שנות מס (A2), שריפת מספר בסירוב הקצאה (B1), איסור גורף על תיקון מסמך שהופק (B2), זיכוי חלקי/שרשור (B3), מסמך issued ללא PDF (B4), ותעודה self-issued שמוצגת כ-Validity Unknown (C1). לא חוסם את בניית Phase 0.
-- **החלטה כספית פתוחה (C3):** Supabase Free משעה פרויקט אחרי 7 ימי חוסר-פעילות ואינו שומר גיבויים כלל — לא תואם ארכיון מס של 7 שנים. ההמלצה: להתחיל ב-₪0 עם עותק חוץ מוצפן ל-R2/B2 + keepalive, ולעבור ל-Pro ($25/חודש) כשיהיו 3+ עסקים אמיתיים. engineering-manager בחר R2 (על פני B2) כברירת מחדל למימוש — שקול לוודא מול המייסד אם יש כבר חשבון קיים באחת מהן.
-- **סוגיה משפטית חדשה (A5):** אחסון PII של לקוחות של עסקים שאינם של המייסד — חובות מנהל מאגר תחת חוק הגנת הפרטיות תיקון 13 (בתוקף מ-2025). מחוץ לסמכות הארכיטקט.
+- **אישור המייסד על ה-plan** (`invoicing-receipts/docs/plan.md`): stack, חלוקת פאזות.
+- **אישור ההחלטות המסומנות ב-ADRs** (A1-A6, B1-B4, C1-C7) — מתוכן 6 דורשות **חוות דעת רו"ח** לפני production: זיכוי יחיד גם לקבלות (A1), מספור continuous בין שנות מס (A2), שריפת מספר בסירוב הקצאה (B1), איסור גורף על תיקון מסמך שהופק (B2), זיכוי חלקי/שרשור (B3), מסמך issued ללא PDF (B4), ותעודה self-issued שמוצגת כ-Validity Unknown (C1).
+- **החלטה כספית פתוחה (C3):** Supabase Free משעה פרויקט אחרי 7 ימי חוסר-פעילות ואינו שומר גיבויים כלל — לא תואם ארכיון מס של 7 שנים. ההמלצה: להתחיל ב-₪0 עם עותק חוץ מוצפן ל-R2/B2 + keepalive, ולעבור ל-Pro ($25/חודש) כשיהיו 3+ עסקים אמיתיים.
+- **סוגיה משפטית (A5):** אחסון PII של לקוחות של עסקים שאינם של המייסד — חובות מנהל מאגר תחת חוק הגנת הפרטיות תיקון 13 (בתוקף מ-2025). מחוץ לסמכות הארכיטקט.
+- **שאלה תפעולית שנפתחה ב-Amendment A:** האם ל-role `postgres` ב-Supabase יש `BYPASSRLS` כחוזה מתועד? כרגע התכנון **לא מסתמך על זה** (FORCE הוסר). אם יאומת רשמית — אפשר להחזיר FORCE גורף ולהדק.
 - חתימה אלקטרונית — נפתר עקרונית (מאובטחת מספיקה, מפתח self-generated פר-עסק, ₪0). שיורי לפני production: אימות נוסח ההוראות מול gov.il/nevo (המקורות הרשמיים חסומים ב-proxy) + חוו"ד רו"ח על "שליטה בלעדית" במפתח בשרת.
 - לוח ספי מספר ההקצאה (10,000 ₪ מ-1.1.2026, 5,000 ₪ מ-1.6.2026) אומת ממקורות משניים בלבד — לאמת מול gov.il לפני Phase 2; תהליך ההרשמה ל-API רשות המסים טרם נחקר.
 - מיצוב ארוך-טווח: כלי פרטי לחבורה או גרעין מודול Billing של SUPER-MESHINE? (לא חוסם MVP. אם כן — יידרש יישור מול ADR-002 שאין בו many-to-many של user↔tenant, ומול ADR-006 בגלל ה-audit ב-triggers בלבד.)
-- **היקף ה-frontend ב-Phase 0:** engineering-manager הכריע לכלול שלד app מינימלי + auth + יצירת עסק + business switcher (לא רק CI assertions) כדי לספק את ה-DoD המקורי של `plan.md` ("משתמש נרשם, יוצר עסק, מחליף בין עסקים"). נקודת יידוע ל-CEO/מייסד לפני dispatch, לא חסימה.
 - קודי הצבע המדויקים של Morning לא אומתו (אתר חסום ב-proxy) — לא חוסם.
 
 ## Session Log
@@ -56,37 +56,36 @@
 - **Related:** [[2026-08-30-digital-signature-computerized-documents]], [[2026-08-30-invoicing-services-feature-benchmark]]
 
 ### 2026-08-30 — Architecture: 3 ADRs for the invoicing project [planned]
-- **What was done:** ה-architect כתב שלושה ADRs ב-`invoicing-receipts/docs/adr/` (סטטוס Proposed בכולם):
+- **What was done:** ה-architect כתב שלושה ADRs ב-`invoicing-receipts/docs/adr/`:
   - **ADR-INV-001** `001-data-model-and-rls.md` — schema מלא (13 טבלאות + 9 enums), RLS על `business_id` דרך `business_members`, מודל 4 roles, ורשימה סגורה של שלושה נתיבי `service_role`.
   - **ADR-INV-002** `002-immutability-and-numbering.md` — הקצאת מספר מטבלת מונים ב-`UPDATE...RETURNING`, `app.issue_document()` כנתיב הפקה יחיד, trigger immutability עם whitelist בגישת default-deny, snapshots, ומכונת מצבים סגורה.
   - **ADR-INV-003** `003-pdf-signing-storage.md` — Chromium serverless לרינדור, pyHanko ל-PAdES-B-T, envelope encryption למפתחות, אחסון + עותק חוץ, ועמוד צפייה ציבורי.
 - **Decisions (מרכזיות):**
   - **RLS משותף** (לא schema-per-business) — תואם ADR-002 של הבית; אבל היחס user↔business הוא **many-to-many** דרך `business_members`, בשונה מ-`users.tenant_id` היחיד של ה-ERP.
-  - **אכיפת "אילו מסמכים מותרים לפי סוג ישות" ב-CHECK constraint על עמודת snapshot** `business_entity_type` בשורת המסמך — ולא trigger, לא composite FK ולא app-layer. הנימוק: snapshot הופך את ההיסטוריה למתארת את עצמה, כך שעסק שעובר פטור→מורשה לא מחליק אחורה על מסמכים ישנים.
+  - **אכיפת "אילו מסמכים מותרים לפי סוג ישות" ב-CHECK constraint על עמודת snapshot** `business_entity_type` בשורת המסמך — ולא trigger, לא composite FK ולא app-layer.
   - **טבלת מונים ולא `SEQUENCE`** — רצפים ב-Postgres הם non-transactional ומייצרים חורים במספור ב-rollback. הפרה חוקית ישירה.
   - **immutability בגישת default-deny:** ה-trigger משווה את כל השורה פחות whitelist — עמודה חדשה עתידית תהיה immutable אוטומטית.
-  - **`issued` הוא מצב סופי.** "מבוטל" הוא תכונה נגזרת (`credited_amount = total_amount`), לא סטטוס. `cancelled` שמור אך ורק לסירוב מספר הקצאה.
-  - **הפקת PDF מחוץ ל-transaction** — כשל Chromium לא מגלגל אחורה הפקה (זה היה מייצר חור במספור מסיבה טכנית). הצינור אידמפוטנטי כי ה-snapshot קפוא.
-  - **PAdES-B-T ולא B-LT** — תעודה self-issued חסרת OCSP/CRL, אין מידע ביטול להטמיע; הצהרה על B-LT הייתה שקר טכני.
-  - **KEK ב-env של Vercel מול ciphertext ב-Supabase** (ולא Supabase Vault) — פיצול בין שתי מערכות; ובנוסף pgsodium במחזור deprecation.
+  - **`issued` הוא מצב סופי.** "מבוטל" הוא תכונה נגזרת (`credited_amount = total_amount`), לא סטטוס.
+  - **הפקת PDF מחוץ ל-transaction** — כשל Chromium לא מגלגל אחורה הפקה. הצינור אידמפוטנטי כי ה-snapshot קפוא.
+  - **PAdES-B-T ולא B-LT** — תעודה self-issued חסרת OCSP/CRL, אין מידע ביטול להטמיע.
+  - **KEK ב-env של Vercel מול ciphertext ב-Supabase** (ולא Supabase Vault) — פיצול בין שתי מערכות; pgsodium במחזור deprecation.
   - **מקור והעתק כשני קבצים חתומים נפרדים** — אי אפשר לסמן "העתק" על קובץ חתום בדיעבד.
-  - **סטייה מודעת מ-ADR-006:** audit ב-DB triggers בלבד, ללא app middleware (אין סוכני AI, ולקוח Supabase עוקף כל ORM middleware).
-- **Notes / Caveats:**
-  - **17 החלטות סומנו כדורשות אישור** (A1-A6 / B1-B4 / C1-C7), מהן 6 דורשות חוות דעת רו"ח.
-  - **ממצא חדש:** Supabase Free משעה פרויקט אחרי 7 ימי חוסר-פעילות, 0 ימי גיבוי, ומוחק פרויקטים מושעים לאורך זמן → **עותק חוץ מוצפן + keepalive הוגדרו כחלק מ-Phase 0**, לא כשיפור עתידי.
-  - Vercel Hobby: 250MB לפונקציית Node (ההרחבה ל-5GB היא Fluid Compute בלבד), 60ש׳ תקרה, ו-500MB לפונקציות Python — לכן `@sparticuz/chromium-min` ו-pyHanko בשני runtimes באותו פרויקט.
-  - ה-ADRs נכתבו בתיקיית הפרויקט ולא ב-`vault/Architecture Decisions/` לפי הנחיה מפורשת — הפרויקט עצמאי. אם ימוזג ל-ERP, יידרש מיזוג גם של ה-ADRs.
-- **Related:** [[002-multi-tenancy-strategy]], [[006-audit-log-and-agent-action-gating]], [[2026-08-30-digital-signature-computerized-documents]], [[2026-08-30-invoicing-services-feature-benchmark]]
+  - **סטייה מודעת מ-ADR-006:** audit ב-DB triggers בלבד, ללא app middleware.
+- **Notes / Caveats:** 17 החלטות סומנו כדורשות אישור, מהן 6 דורשות חוות דעת רו"ח. ממצא חדש: Supabase Free משעה פרויקט אחרי 7 ימי חוסר-פעילות, 0 ימי גיבוי → עותק חוץ מוצפן + keepalive הוגדרו כחלק מ-Phase 0.
+- **Related:** [[002-multi-tenancy-strategy]], [[006-audit-log-and-agent-action-gating]], [[2026-08-30-digital-signature-computerized-documents]]
 
-### 2026-08-30 — Engineering Phase 0 plan: 17 subtasks + RLS gap escalation [planned]
-- **What was done:** engineering-manager קרא את שלושת ה-ADRs (עכשיו Accepted), את `plan.md`, ואת מצב הקוד (עדיין ריק — רק docs). כתב work plan מלא ל-Phase 0 ב-`vault/Engineering/invoicing-phase-0-plan.md`: 13 subtasks ל-backend-builder (scaffold pnpm+Next.js+Supabase CLI ללא Drizzle; migrations 0001-0008 ל-extensions/enums/טבלאות/RLS helpers/RLS policies/audit+immutability triggers/`issue_document()`; `api/keygen.py`+`POST /api/businesses`; isolation test 12 assertions; numbering race test 20 concurrent; CI pipeline עם 4 בדיקות מטא + down/up roundtrip; ops jobs keepalive+backup+restore-test) ו-4 subtasks ל-frontend-builder (app shell+RTL, auth, יצירת עסק, business switcher).
+### 2026-08-30 — ADR-INV-001 Amendment A: RLS gaps + a broken foundational assumption [done]
+- **What was done:** escalation מה-engineering-manager על שלושה פערי RLS שחסמו את משימות B9/F3 ב-`vault/Engineering/invoicing-phase-0-plan.md`. בבדיקתם התגלה **פער רביעי, חמור יותר**, באותו סעיף. ADR-INV-001 עודכן במקום (Status: Accepted, Amended 2026-08-30) עם סעיף Amendment Log, סעיפים חדשים D3.1, D3.2, D10, ו-D7 שנכתב מחדש.
 - **Decisions:**
-  - **הכרעת גבול Phase 0/1 ל-frontend:** נכלל שלד app מינימלי (auth+יצירת עסק+switcher) ב-Phase 0, לא רק ב-Phase 1, כדי לספק את ה-DoD המקורי של `plan.md` ("משתמש נרשם, יוצר עסק, מחליף בין עסקים") עם משתמש אנושי אמיתי — לא רק CI assertions סינתטיים. עורך המסמכים/קטלוג/דשבורד/PDF rendering נשארים Phase 1 במלואם.
-  - **Stack ל-migrations:** SQL גולמי + Supabase CLI migrations (`supabase/migrations/*.sql`), **לא** Drizzle — לפי מה שה-ADRs כותבים במפורש (raw `create table`/`create function` עם `SECURITY DEFINER`). שונה מה-ERP הראשי.
-  - **R2 נבחר על פני B2** לעותק הגיבוי החוץ (שתיהן שקולות ב-ADR) — החלטת builder-level.
-  - **פישוט בדיקת race:** מזריקים שורת `business_signing_keys` דמה ישירות ל-DB (לא דרך keygen.py אמיתי) כדי לפרק את תלות בדיקת המספור המקבילה מ-subtask יצירת המפתח.
+  - **A-1 — policies ל-`businesses`:** SELECT לחברים (על `id`, לא `business_id`), UPDATE ל-`owner`, **ללא INSERT ו-DELETE policies כלל**. בנוסף trigger שחוסם שינוי ב-`created_by`/`tax_id`/`entity_type`.
+  - **A-2 — D7 נכתב מחדש כ"מפת scoping" של 4 קטגוריות** במקום רשימת חריגים שטוחה. `businesses` היא scope-root (scoping על `id`), לא חריג גלובלי. שאילתת ה-CI תוקנה בהתאם.
+  - **A-3 — bootstrap:** הצעת ה-EM אושרה — `app.create_business()` ב-`SECURITY DEFINER`, אטומית (עסק + שורת owner ב-transaction אחד), עם מגבלת 10 עסקים למשתמש כבלם abuse. **השיקול המכריע נגד policy-based bootstrap:** שתי קריאות REST נפרדות ללא transaction, וכשל בשנייה משאיר עסק יתום ללא חברים ש**שורף את ה-`tax_id` לצמיתות** דרך `unique(tax_id)`. לא נוסף נתיב service_role רביעי.
+  - **A-4 — הפער שלא דווח, והחשוב מבין הארבעה:** `FORCE ROW LEVEL SECURITY` הגורף ששובץ ב-D3 **שובר את כל דפוס ה-SECURITY DEFINER של ה-ADR**. תחת FORCE גם בעלת הטבלה כפופה ל-policies, ופונקציית definer רצה בזהות `postgres` שאינו חבר ב-`authenticated` — כלומר דחייה, לא בייפאס. שלוש תוצאות שהיו מתגלות רק ב-runtime: `app.current_business_ids()` מחזירה 0 שורות (**נעילה מוחלטת של המערכת**), `issue_document()` לא יכולה לכתוב ל-`document_counters` (אין לה policy כתיבה במכוון), וה-audit trigger לא יכול לכתוב ל-`audit_log`. **התיקון:** FORCE יורד מכל הטבלאות פרט ל-`business_signing_keys` — הטבלה היחידה שאף definer לא נוגע בה, ושהקורא הלגיטימי היחיד שלה (`service_role`) מדלג מתוקף `BYPASSRLS` שגובר על FORCE.
+  - **פיצוי על אובדן ה-FORCE:** בדיקת CI חדשה (ה) שמשווה את רשימת ה-`SECURITY DEFINER` functions ב-DB מול whitelist סגור של 7 פונקציות. זה ה-control האמיתי, כי דילוג-בעלים הוא בדיוק מה שהפונקציות האלה עושות.
+  - **A-5 (קוסמטי):** `_migrations` הוסרה — Supabase CLI כותב ל-`supabase_migrations.schema_migrations`, מחוץ ל-`public`, וסינון ה-`nspname` מוציא אותו ממילא.
 - **Notes / Caveats:**
-  - **⚠️ Escalation לארכיטקט (חוסם 2 מ-17 subtasks בלבד, לא את השאר):** אין RLS ל-`businesses` עצמה; סתירה בבדיקת ה-CI של D7 (`businesses` לא ברשימה הסגורה ואין לה `business_id`); ואין מנגנון bootstrap ל-owner ראשון ב-`business_members` (chicken-and-egg מול `bm_manage` policy שדורשת owner קיים). ככל הנראה נדרש RPC `app.create_business()` בדפוס `SECURITY DEFINER` כמו `issue_document()`. subtasks B1-B8 ו-F1-F2 יכולים להתקדם מיד ללא תלות בתשובה.
-  - `api/keygen.py` הוא Python — חריג יחיד בפרויקט TypeScript-first, מסומן כסיכון תזמון (לא חסימה).
-  - CI צריך `auth.uid()`/`auth.users` אמיתיים (Supabase-specific) — backend-builder צריך להחליט בין `supabase start` (Docker, איטי) ל-stub ידני (מהיר, סיכון drift) בזמן ביצוע.
-- **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]], [[002-immutability-and-numbering]], [[003-pdf-signing-storage]], [[2026-05-07-1700-bootstrap-dev-env-7a-plan]]
+  - אומת מול תיעוד Postgres: "a security definer function only skips RLS when its owner can — a function owned by a role without bypassrls, or reading a table set to force row level security, evaluates the membership policy again". הסתמכות על `BYPASSRLS` של `postgres` ב-Supabase נדחתה כהנחת פלטפורמה שאינה חוזה מתועד.
+  - Amendment A לא הוסיף החלטות הטעונות אישור — כל הארבעה תיקוני נכונות בסמכות הארכיטקט. A1-A6 לא הושפעו.
+  - ADR-INV-002 ו-003 לא הצריכו שינוי (FORCE הוזכר רק ב-001), אבל **ADR-INV-002 היה נשבר בפועל בלי A-4**.
+  - חוב שנוצר: כל פונקציית definer עתידית מדלגת על RLS. בדיקת CI (ה) היא חובה, לא nice-to-have.
+- **Related:** [[002-multi-tenancy-strategy]], `vault/Engineering/invoicing-phase-0-plan.md`
