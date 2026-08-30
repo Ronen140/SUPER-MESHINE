@@ -1,7 +1,8 @@
 import { FileText, LayoutDashboard, Users } from "lucide-react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/auth/logout-button";
-import { BusinessSwitcherPlaceholder } from "@/components/layout/business-switcher-placeholder";
+import { BusinessSwitcher } from "@/components/layout/business-switcher";
+import type { BusinessListItem } from "@/lib/businesses/get-user-businesses";
 
 const ACTIVE_NAV_ITEMS = [{ href: "/", label: "בית", icon: LayoutDashboard }] as const;
 
@@ -15,10 +16,16 @@ const UPCOMING_NAV_ITEMS = [
   { label: "לקוחות", icon: Users },
 ] as const;
 
-export function Sidebar() {
+export function Sidebar({
+  businesses,
+  activeBusinessId,
+}: {
+  businesses: BusinessListItem[];
+  activeBusinessId: string | null;
+}) {
   return (
     <aside className="flex w-64 shrink-0 flex-col gap-4 border-e border-border bg-card p-4">
-      <BusinessSwitcherPlaceholder />
+      <BusinessSwitcher businesses={businesses} activeBusinessId={activeBusinessId} />
 
       <nav aria-label="ניווט ראשי" className="flex flex-1 flex-col gap-1">
         {ACTIVE_NAV_ITEMS.map(({ href, label, icon: Icon }) => (

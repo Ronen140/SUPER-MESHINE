@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { isNextControlFlowError } from "@/lib/next-control-flow-error";
 import { createClient } from "@/lib/supabase/server";
 
 export type BusinessListItem = {
@@ -35,9 +36,15 @@ export const getUserBusinesses = cache(async (): Promise<BusinessListItem[]> => 
 
     return data ?? [];
   } catch (err) {
-    // No live Supabase project yet in this environment (or a real outage) —
-    // fail to an empty list rather than crashing the whole app shell. The
-    // switcher/dashboard already handle a zero-business state.
+    // Next.js's own internal control-flow signals (DYNAMIC_SERVER_USAGE from using
+    // cookies()/headers() during static-generation attempts, redirect(), notFound())
+    // are thrown as errors but must never be swallowed — Next relies on them
+    // propagating to decide the route is dynamic / to actually redirect.
+    if (isNextControlFlowError(err)) throw err;
+
+    // A real Supabase failure: no live project yet in this environment (or an
+    // actual outage) — fail to an empty list rather than crashing the whole app
+    // shell. The switcher/dashboard already handle a zero-business state.
     console.error("[get-user-businesses] failed to load businesses:", err);
     return [];
   }
