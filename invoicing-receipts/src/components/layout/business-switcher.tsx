@@ -98,7 +98,7 @@ export function BusinessSwitcher({
           <button
             type="button"
             disabled={isPending}
-            aria-label="בחירת עסק פעיל"
+            aria-label={`עסק פעיל: ${businessLabel(active)}. לחיצה לבחירת עסק אחר.`}
             className="flex w-full items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-start text-sm shadow-sm hover:bg-accent disabled:cursor-wait disabled:opacity-70"
           >
             <BusinessAvatar business={active} />

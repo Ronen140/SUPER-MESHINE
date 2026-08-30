@@ -1,8 +1,11 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { z } from "zod";
 import { ACTIVE_BUSINESS_COOKIE } from "@/lib/businesses/constants";
 import { createClient } from "@/lib/supabase/server";
+
+const businessIdSchema = z.uuid();
 
 /**
  * F4 business switcher: persists which business is "active" in an httpOnly cookie so
@@ -13,10 +16,19 @@ import { createClient } from "@/lib/supabase/server";
  * (`businesses_read`, ADR-INV-001 §D3.1) silently excludes any business the caller
  * isn't a member of, so a `SELECT ... WHERE id = $1` returning zero rows means "not
  * mine" regardless of whether the id is malformed, unknown, or someone else's business.
+ * The `uuid()` shape check below is a cheap, explicit rejection for an obviously
+ * malformed id (matches the zod-at-every-boundary discipline the rest of the project
+ * follows) — RLS already made this safe either way, this only makes a client bug
+ * fail with a clearer message instead of a generic "not found" (code-quality review,
+ * Nit #1).
  */
 export async function setActiveBusinessId(
   businessId: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!businessIdSchema.safeParse(businessId).success) {
+    return { ok: false, error: "מזהה עסק לא תקין." };
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("businesses")

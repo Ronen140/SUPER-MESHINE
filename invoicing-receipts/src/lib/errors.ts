@@ -75,6 +75,34 @@ export const INV_ERROR_MESSAGES: Record<string, string> = {
 
 const DEFAULT_MESSAGE = "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.";
 
+/** Shared with `src/lib/supabase/auth-errors.ts` so the two domains show identical copy. */
+export const NETWORK_MESSAGE = "בעיית תקשורת מול השרת. בדקו את החיבור לאינטרנט ונסו שוב.";
+
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "";
+}
+
+/**
+ * Domain-neutral fallback for a raw, unexpected `catch (err)` — e.g. a thrown network
+ * error from `fetch()` — as opposed to `toUserMessage()`, which parses a known `INV_*`
+ * code out of an API's `{ error }` response body. Used by non-auth forms (e.g.
+ * `business-form.tsx`) that have nothing to do with Supabase Auth and previously
+ * (incorrectly) reused `mapAuthError` just for its generic network-detection regex
+ * (code-quality review, vault/Reviews/quality/2026-08-30-invoicing-f3-f4.md, Issue #5).
+ */
+export function toFriendlyNetworkError(error: unknown): string {
+  const message = extractErrorMessage(error);
+  if (/fetch failed|failed to fetch|networkerror/i.test(message)) {
+    return NETWORK_MESSAGE;
+  }
+  return DEFAULT_MESSAGE;
+}
+
 /**
  * Extracts the `INV_*` code from a raw Postgres error message (format:
  * `"INV_CODE: free-text detail"`) and returns the matching Hebrew message. Falls back to a

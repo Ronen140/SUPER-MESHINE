@@ -1,5 +1,5 @@
+import { unstable_rethrow } from "next/navigation";
 import { cache } from "react";
-import { isNextControlFlowError } from "@/lib/next-control-flow-error";
 import { createClient } from "@/lib/supabase/server";
 
 export type BusinessListItem = {
@@ -40,7 +40,11 @@ export const getUserBusinesses = cache(async (): Promise<BusinessListItem[]> => 
     // cookies()/headers() during static-generation attempts, redirect(), notFound())
     // are thrown as errors but must never be swallowed — Next relies on them
     // propagating to decide the route is dynamic / to actually redirect.
-    if (isNextControlFlowError(err)) throw err;
+    // `unstable_rethrow` is Next's own official helper for exactly this check (a prior
+    // hand-rolled digest-prefix version of this got a prefix wrong for the installed
+    // Next 15.5.24 — code-quality review, Issue #3 — so this delegates to the
+    // framework instead of re-maintaining that list).
+    unstable_rethrow(err);
 
     // A real Supabase failure: no live project yet in this environment (or an
     // actual outage) — fail to an empty list rather than crashing the whole app

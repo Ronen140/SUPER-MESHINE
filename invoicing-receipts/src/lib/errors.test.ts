@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toUserMessage } from "./errors";
+import { toFriendlyNetworkError, toUserMessage } from "./errors";
 
 describe("toUserMessage", () => {
   it("maps a known INV_* code to its Hebrew message", () => {
@@ -63,6 +63,29 @@ describe("toUserMessage", () => {
       "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",
     );
     expect(toUserMessage(undefined)).toBe(
+      "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",
+    );
+  });
+});
+
+describe("toFriendlyNetworkError", () => {
+  it("maps a raw fetch throw to a Hebrew network message", () => {
+    expect(toFriendlyNetworkError(new TypeError("Failed to fetch"))).toBe(
+      "בעיית תקשורת מול השרת. בדקו את החיבור לאינטרנט ונסו שוב.",
+    );
+    expect(toFriendlyNetworkError({ message: "fetch failed" })).toBe(
+      "בעיית תקשורת מול השרת. בדקו את החיבור לאינטרנט ונסו שוב.",
+    );
+  });
+
+  it("falls back to the generic message for a non-network error", () => {
+    expect(toFriendlyNetworkError(new Error("something else went wrong"))).toBe(
+      "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",
+    );
+  });
+
+  it("falls back to the generic message for a bare unknown value", () => {
+    expect(toFriendlyNetworkError(undefined)).toBe(
       "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",
     );
   });

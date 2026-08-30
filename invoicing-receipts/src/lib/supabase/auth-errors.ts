@@ -1,5 +1,6 @@
+import { NETWORK_MESSAGE } from "@/lib/errors";
+
 const GENERIC_MESSAGE = "משהו השתבש. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.";
-const NETWORK_MESSAGE = "בעיית תקשורת מול השרת. בדקו את החיבור לאינטרנט ונסו שוב.";
 
 /** Ordered so the first matching pattern wins; keep specific patterns before generic ones. */
 const KNOWN_PATTERNS: Array<{ pattern: RegExp; message: string }> = [

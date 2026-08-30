@@ -4,12 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { setActiveBusinessId } from "@/app/(app)/businesses/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toUserMessage } from "@/lib/errors";
+import { toFriendlyNetworkError, toUserMessage } from "@/lib/errors";
 import { type BusinessInput, businessSchema } from "@/lib/schemas/business";
-import { mapAuthError } from "@/lib/supabase/auth-errors";
 
 const ENTITY_TYPE_OPTIONS = [
   {
@@ -24,19 +25,25 @@ const ENTITY_TYPE_OPTIONS = [
   },
 ];
 
-type CreatedBusiness = { id: string; legal_name: string; tax_id: string };
+// `POST /api/businesses`'s two possible response shapes. Validated with zod (rather than
+// cast) so a drift in the API's response shape fails loudly here instead of silently
+// producing `undefined` fields downstream (code-quality review, Issue #4).
+const createBusinessSuccessSchema = z.object({
+  business: z.object({
+    id: z.string(),
+    legal_name: z.string(),
+    tax_id: z.string(),
+  }),
+  signingKeyError: z.string().nullable(),
+});
+type CreatedBusiness = z.infer<typeof createBusinessSuccessSchema>["business"];
+
+const apiErrorResponseSchema = z.object({ error: z.string() });
 
 /** `{ error: string }` shape returned by `POST /api/businesses`/`POST /api/keygen` on failure. */
 function extractApiErrorMessage(payload: unknown): string | null {
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "error" in payload &&
-    typeof (payload as { error: unknown }).error === "string"
-  ) {
-    return toUserMessage((payload as { error: string }).error);
-  }
-  return null;
+  const parsed = apiErrorResponseSchema.safeParse(payload);
+  return parsed.success ? toUserMessage(parsed.data.error) : null;
 }
 
 export function BusinessForm() {
@@ -80,10 +87,21 @@ export function BusinessForm() {
         return;
       }
 
-      const { business, signingKeyError } = payload as {
-        business: CreatedBusiness;
-        signingKeyError: string | null;
-      };
+      const parsed = createBusinessSuccessSchema.safeParse(payload);
+      if (!parsed.success) {
+        console.error("[business-form] unexpected /api/businesses response shape:", payload);
+        setFormError(toUserMessage(null));
+        return;
+      }
+      const { business, signingKeyError } = parsed.data;
+
+      // The business the user just created should become the active one — otherwise a
+      // second-or-later business silently leaves the previous business active (code-quality
+      // review, Issue #1). Best-effort: the business already exists validly either way.
+      const activated = await setActiveBusinessId(business.id);
+      if (!activated.ok) {
+        console.error("[business-form] failed to activate the new business:", activated.error);
+      }
 
       if (signingKeyError) {
         setPendingKeyBusiness(business);
@@ -94,7 +112,7 @@ export function BusinessForm() {
       router.push("/");
       router.refresh();
     } catch (err) {
-      setFormError(mapAuthError(err));
+      setFormError(toFriendlyNetworkError(err));
     }
   });
 
@@ -121,7 +139,7 @@ export function BusinessForm() {
       router.push("/");
       router.refresh();
     } catch (err) {
-      setKeygenError(mapAuthError(err));
+      setKeygenError(toFriendlyNetworkError(err));
     } finally {
       setIsRetryingKey(false);
     }

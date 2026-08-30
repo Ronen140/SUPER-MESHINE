@@ -39,11 +39,21 @@ describe("BusinessSwitcher", () => {
     render(<BusinessSwitcher businesses={oneBusiness} activeBusinessId="biz-1" />);
 
     expect(screen.getByText('רונן דורמן בע"מ')).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "בחירת עסק פעיל" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^עסק פעיל:/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /עסק חדש/ })).toHaveAttribute(
       "href",
       "/businesses/new",
     );
+  });
+
+  it("exposes the active business's name in the trigger's accessible name (not just static text)", () => {
+    render(<BusinessSwitcher businesses={twoBusinesses} activeBusinessId="biz-1" />);
+
+    // Regression: an aria-label with no business name in it overrides the visible text
+    // for screen readers entirely (code-quality review, Issue #2).
+    expect(
+      screen.getByRole("button", { name: /עסק פעיל: רונן דורמן בע"מ/ }),
+    ).toBeInTheDocument();
   });
 
   it("shows a dropdown with both businesses, marks the active one, and switches on selection", async () => {
@@ -51,7 +61,7 @@ describe("BusinessSwitcher", () => {
     const user = userEvent.setup();
     render(<BusinessSwitcher businesses={twoBusinesses} activeBusinessId="biz-1" />);
 
-    await user.click(screen.getByRole("button", { name: "בחירת עסק פעיל" }));
+    await user.click(screen.getByRole("button", { name: /^עסק פעיל:/ }));
 
     expect(screen.getAllByText('רונן דורמן בע"מ').length).toBeGreaterThan(0);
     const otherItem = await screen.findByText("מועדון הנוער");
@@ -65,7 +75,7 @@ describe("BusinessSwitcher", () => {
     const user = userEvent.setup();
     render(<BusinessSwitcher businesses={twoBusinesses} activeBusinessId="biz-1" />);
 
-    await user.click(screen.getByRole("button", { name: "בחירת עסק פעיל" }));
+    await user.click(screen.getByRole("button", { name: /^עסק פעיל:/ }));
     const items = await screen.findAllByText('רונן דורמן בע"מ');
     // The last match is the dropdown item (first is the trigger's own label).
     await user.click(items[items.length - 1] as HTMLElement);
@@ -77,7 +87,7 @@ describe("BusinessSwitcher", () => {
     const user = userEvent.setup();
     render(<BusinessSwitcher businesses={twoBusinesses} activeBusinessId="biz-1" />);
 
-    await user.click(screen.getByRole("button", { name: "בחירת עסק פעיל" }));
+    await user.click(screen.getByRole("button", { name: /^עסק פעיל:/ }));
 
     // Rendered via DropdownMenuItem asChild -> Radix gives it role="menuitem",
     // not the anchor's default "link" role.

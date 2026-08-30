@@ -9,6 +9,11 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, refresh: refreshMock }),
 }));
 
+const setActiveBusinessIdMock = vi.fn();
+vi.mock("@/app/(app)/businesses/actions", () => ({
+  setActiveBusinessId: (businessId: string) => setActiveBusinessIdMock(businessId),
+}));
+
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
@@ -27,6 +32,8 @@ describe("BusinessForm", () => {
     pushMock.mockReset();
     refreshMock.mockReset();
     fetchMock.mockReset();
+    setActiveBusinessIdMock.mockReset();
+    setActiveBusinessIdMock.mockResolvedValue({ ok: true });
   });
 
   it("shows validation errors and does not call the API when submitted empty", async () => {
@@ -81,6 +88,26 @@ describe("BusinessForm", () => {
     expect(refreshMock).toHaveBeenCalledOnce();
   });
 
+  it("activates the newly created business before navigating home (F3/F4 wiring)", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        { business: { id: "biz-42", legal_name: "עסק שני", tax_id: "123456789" }, signingKeyError: null },
+        true,
+      ),
+    );
+    const user = userEvent.setup();
+    render(<BusinessForm />);
+
+    await fillMinimalValidForm(user);
+    await user.click(screen.getByRole("button", { name: "יצירת עסק" }));
+
+    await screen.findByRole("button", { name: "יצירת עסק" });
+    // Regression: creating a second (or later) business used to leave whichever
+    // business was already active untouched — code-quality review, Issue #1.
+    expect(setActiveBusinessIdMock).toHaveBeenCalledWith("biz-42");
+    expect(pushMock).toHaveBeenCalledWith("/");
+  });
+
   it("maps an INV_TAX_ID_EXISTS API error to Hebrew and does not navigate", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({ error: 'INV_TAX_ID_EXISTS: duplicate key value violates unique constraint "businesses_tax_id_uk"' }, false),
@@ -131,6 +158,9 @@ describe("BusinessForm", () => {
       screen.getByText("לעסק אין מפתח חתימה פעיל — לא ניתן להפיק מסמכים כרגע."),
     ).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
+    // The business is activated as soon as it's created, even while the signing-key
+    // banner is showing — not only once the user eventually navigates away.
+    expect(setActiveBusinessIdMock).toHaveBeenCalledWith("biz-1");
 
     fetchMock.mockResolvedValueOnce(jsonResponse({}, true));
     await user.click(screen.getByRole("button", { name: "נסה שוב" }));
