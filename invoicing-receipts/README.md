@@ -2,7 +2,7 @@
 
 פרויקט חדש: מערכת להפקה וניהול של מסמכים חשבונאיים לעסק — חשבוניות מס, קבלות, חשבוניות מס-קבלה וחשבוניות עסקה.
 
-> **סטטוס:** Phase 0 בבנייה. ה-scope וה-stack נקבעו (`docs/plan.md` + `docs/adr/`). scaffold + migrations 0001-0004 (extensions, enums, טבלאות ליבה, טבלאות מסמכים) קיימים. RLS, triggers, `issue_document()`, יצירת עסק, ו-UI עדיין לא — ראו `vault/Engineering/invoicing-phase-0-plan.md`.
+> **סטטוס:** Phase 0 בבנייה. ה-scope וה-stack נקבעו (`docs/plan.md` + `docs/adr/`). scaffold + migrations 0001, 0002, 0003a, 0003b (extensions, enums, טבלאות ליבה, טבלאות מסמכים) קיימים. RLS, triggers, `issue_document()`, יצירת עסק, ו-UI עדיין לא — ראו `vault/Engineering/invoicing-phase-0-plan.md`.
 
 ## מטרה
 
@@ -79,7 +79,7 @@ pnpm db:migrate     # supabase migration up
 - Engineering plan ל-Phase 0 — 13 subtasks ל-backend-builder + 4 ל-frontend-builder
   (`vault/Engineering/invoicing-phase-0-plan.md`).
 - **B1-B4 בוצעו:** scaffold (Next.js 15 + Tailwind v4 + Biome + Vitest + Supabase CLI config),
-  migrations 0001-0004 (extensions, enums, טבלאות ליבה כולל `users`+auth-sync trigger ו-
+  migrations 0001, 0002, 0003a, 0003b (extensions, enums, טבלאות ליבה כולל `users`+auth-sync trigger ו-
   business_members owner-guard trigger, טבלאות מסמכים כולל `signed_total`). **עדיין אין RLS
   policies, triggers של audit/immutability, `issue_document()`, יצירת עסק, ו-UI** — אלו B5-B13 +
   F1-F4, חלקם חסומים ב-escalation פתוח לארכיטקט (RLS ל-`businesses` + bootstrap ל-owner ראשון).
