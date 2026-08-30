@@ -57,6 +57,9 @@ export const INV_ERROR_MESSAGES: Record<string, string> = {
   INV_PAYMENTS_MISMATCH: "סכום התקבולים אינו תואם את הסכום לתשלום במסמך.",
   INV_NO_VAT_RATE: 'לא נמצא שיעור מע"מ בתוקף לתאריך ההפקה.',
   INV_NO_SIGNING_KEY: "לעסק אין מפתח חתימה פעיל — לא ניתן להפיק מסמכים כרגע.",
+  // 0010_addendum_fixes.sql (ADR-INV-002 Addendum A′-2): a document cannot be issued
+  // dated after the moment it is actually issued.
+  INV_FUTURE_ISSUE_DATE: "לא ניתן להפיק מסמך עם תאריך הפקה עתידי.",
 
   // app.set_start_number() (0008_issue_function.sql, ADR-INV-001 Implementation Notes #7)
   INV_NOT_OWNER: "רק בעלים של העסק רשאי לקבוע את מספר ההתחלה של סדרת המספור.",

@@ -22,6 +22,12 @@ describe("toUserMessage", () => {
     );
   });
 
+  it("maps INV_FUTURE_ISSUE_DATE (ADR-INV-002 Addendum A′-2) to its Hebrew message", () => {
+    expect(toUserMessage("INV_FUTURE_ISSUE_DATE: issue date 2027-01-01 is in the future")).toBe(
+      "לא ניתן להפיק מסמך עם תאריך הפקה עתידי.",
+    );
+  });
+
   it("falls back to a generic Hebrew message for an unrecognized INV_* code", () => {
     expect(toUserMessage("INV_SOMETHING_NEW_NOT_YET_MAPPED: detail")).toBe(
       "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",
