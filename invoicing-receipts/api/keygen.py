@@ -93,6 +93,47 @@ def _insert_signing_key(record: dict, *, supabase_url: str, service_role_key: st
         raise KeygenError(502, "Could not reach Supabase") from error
 
 
+def _log_key_create_event(
+    record: dict, *, supabase_url: str, service_role_key: str
+) -> None:
+    """Calls public.log_event() (0016_log_event_and_fixes.sql) via PostgREST's RPC endpoint,
+    as service_role. Never raises — a failure here is logged server-side (ADR-INV-003 §D4's
+    own logging rule: never key material) rather than surfaced to the caller, since the
+    signing key itself is already durably written by the time this runs."""
+    body = json.dumps(
+        {
+            "p_business_id": record["business_id"],
+            "p_action": "key_create",
+            "p_table_name": "business_signing_keys",
+            "p_record_id": None,
+            "p_meta": {
+                "certificate_serial": record["certificate_serial"],
+                "kek_id": record["kek_id"],
+            },
+        }
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        f"{supabase_url}/rest/v1/rpc/log_event",
+        data=body,
+        method="POST",
+        headers={
+            "apikey": service_role_key,
+            "Authorization": f"Bearer {service_role_key}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10):
+            pass
+    except (urllib.error.HTTPError, urllib.error.URLError):
+        _logger.exception(
+            "log_event(key_create) failed for business %s — the signing key itself was "
+            "still created successfully",
+            record["business_id"],
+        )
+
+
 def generate_and_store_signing_key(payload: dict) -> dict:
     """Orchestrates one full keygen request: validate input, generate+encrypt the key,
     insert it. Raises `KeygenError` for every failure mode; never returns key material."""
@@ -116,6 +157,7 @@ def generate_and_store_signing_key(payload: dict) -> dict:
     )
 
     _insert_signing_key(record, supabase_url=supabase_url, service_role_key=service_role_key)
+    _log_key_create_event(record, supabase_url=supabase_url, service_role_key=service_role_key)
 
     # ADR-INV-003 §D4 logging rule: "לעולם לא חומר מפתח, לא DEK, לא KEK" — only
     # non-sensitive metadata is ever returned to the caller.

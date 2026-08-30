@@ -306,6 +306,16 @@
 - **Notes / Caveats:** `scripts/ci-schema-checks.sql`'s whitelist (ה) — 10 פונקציות — עכשיו **מאושר במלואו** ע"י Amendment C-2 (לא "pending" יותר). לא בוצע commit/push.
 - **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]]
 
+### 2026-08-30 — code-quality review fixes (Batch 3): log_event() ממומשת, TOCTOU על מגבלת 10 עסקים, sanitize error, KEK base64 [done]
+- **What was done:** ארבעה תיקוני code-quality, כולם ב-`0016_log_event_and_fixes.sql` (+down) פרט לשניים האחרונים (TS/Python).
+  1. **🔴 `public.log_event()` (ADR-INV-001 §D11) לא מומשה מעולם** — `api/keygen.py` כתב ל-`business_signing_keys` בלי שורת audit (הפרת invariant #2). מומשה במלואה לפי §D11, **עם הרחבה אחת מתועדת**: קריאה מ-`service_role` (כמו `api/keygen.py`, שאין לו `auth.uid()`) עוקפת את בדיקת ה-חברות ונכתבת עם `actor_type='service'` — אותה אבחנה ש-`app.audit_trigger()` כבר עושה. `keygen.py` קורא ל-`log_event(key_create)` אחרי ה-INSERT; כשל בקריאה **לא** מפיל את הבקשה (המפתח כבר נכתב).
+  2. **🟡 TOCTOU על מגבלת 10 העסקים** (שוחזר אמפירית ע"י ה-reviewer) — `public.create_business()` תוקנה: `pg_advisory_xact_lock(hashtext(v_uid::text))` מיד אחרי בדיקת הפרופיל, לפני ה-`count`. Regression: 5 קריאות מקביליות אמיתיות (5 תהליכי `psql` נפרדים) ב-count=9 → **בדיוק** עסק אחד מצליח, 4 נכשלים ב-`INV_BUSINESS_LIMIT`, סה"כ 10 בדיוק (לפני התיקון: 12).
+  3. **🟡 `src/app/api/businesses/route.ts` הדליפה `error.message` גולמי** מ-Postgres ללקוח — עודכן ל-`toUserMessage(error.message)` (`src/lib/errors.ts`) — אף פעם לא טקסט/שם-constraint גולמי.
+  4. **🟡 KEK נקרא כ-hex בעוד ADR-INV-003 §D4 קובע base64** — `api/_keygen_core.py`'s `kek_from_env()` תוקנה ל-`base64.b64decode` (עם שגיאה ברורה על base64 לא תקין); `.env.example` עודכן עם דוגמת ייצור.
+- **Verified (בפועל):** `tests/create-business-race.test.ts` (חדש, מרוץ אמיתי) ירוק; `log_event()` נבדק ידנית משני הנתיבים (authenticated עם חברות תקינה/`INV_FORBIDDEN`/`INV_BAD_EVENT`, ו-service_role ללא חברות); pytest חדשים ל-keygen (2 קריאות urlopen — insert ואז log_event; כשל ב-log_event לא מפיל את הבקשה) ול-KEK base64 (תקין + שגיאה ברורה על קלט לא-base64). Roundtrip מלא 0001→**0016** + **8/8** בדיקות CI. `pnpm test` **123/123**, `typecheck` נקי. `pytest` **21/21** (מ-19).
+- **Notes / Caveats:** ההרחבה של `log_event()` ל-`service_role` (סעיף 1) היא לא נוסח מילולי מה-ADR — טעונה אישור ארכיטקט, כמו שאר ההרחבות שסומנו הסבב הזה. לא בוצע commit/push.
+- **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]], [[003-pdf-signing-storage]]
+
 ### 2026-08-30 — ADR-INV-001 Amendment C: two production-breaking bugs confirmed, one fix redirected [done]
 *(רשומת הארכיטקט — נכתבה ע"י ה-CEO בשמו; הכתיבה המקורית שלו אבדה בהתנגשות עם סוכן אחר.)*
 - **What was done:** שלושת ממצאי Batch 3 (`9ba0668`) הוכרעו. ADR-INV-001 עודכן במקום (Amended: A, B, C) — §D3 (grants), §D3.2 (whitelist 9→10 + תיקון נימוק ה-FORCE), §D3.3 (חידוד), §D5, ובדיקות CI 7→8.
