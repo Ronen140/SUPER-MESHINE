@@ -368,8 +368,8 @@
 
 **לקח מצטבר (משתי הטעויות ברצף):** בכל שינוי שנוגע למספור/שמות קבצים בפועל, המקור הראשוני היחיד המהימן הוא הדיסק/git (`ls`, `git show`) — לא תיאור טקסטואלי ב-vault, ולא הנחה מדיספאץ' קודם. מעכשיו: לפני כל revision שנוגעת ל-migration numbering, להריץ `ls supabase/migrations/` ישירות.
 
-## Phase 0 Acceptance Review — 2026-08-30
+## Phase 0 Acceptance Review — 2026-08-30 (final: ACCEPT)
 
-**Result: ⚠️ ACCEPT-WITH-CONDITIONS.** Full per-subtask table, evidence, and reasoning: [[invoicing-phase-0-acceptance]].
+**Result: ✅ ACCEPT.** Full per-subtask table, evidence, and reasoning: [[invoicing-phase-0-acceptance]].
 
-Summary: B1-B8, B10-B13, F1-F2 all ✅ accepted (spec + code-quality-reviewer, plus domain-reviewer on B6-B8). B9 ⚠️ blocked on migration `0017` (audit log on signing-key creation — a confirmed CLAUDE.md invariant #2 gap; first fix rejected by architect, replacement in progress, unreviewed). F3/F4 ⚠️ spec-accepted but never passed code-quality-reviewer at all. B14 (ops jobs) never built — not blocking this sandbox round, but required before connecting to a live Supabase project. Migration numbering diverged further from Revision 3's table as Amendments B/C and Addendum A′ were dispatched directly by the CEO mid-build (final list: `0001`-`0017`, expected and accepted — see acceptance doc for the full as-built map).
+All 18 subtasks (B1-B14, F1-F4) accepted. The three ACCEPT-WITH-CONDITIONS items from the first acceptance pass are closed and independently re-verified: migration `0017` (audit log on signing-key creation, architecturally correct fix — direct `service_role` insert, not the architect-rejected `log_event()` extension), F3/F4 code-quality-reviewer pass (0🔴, one real forward-risk 🟡 fixed — F3→F4 activation wiring), and B14 (ops jobs built + verified end-to-end, which also caught and fixed a genuine B13 defect: the CI workflow was registered outside GitHub's scanned `.github/workflows/` path and would never have run automatically). All 4 invariants met end-to-end with independently-reproduced evidence. Non-blocking follow-ups only: a real GitHub Actions run to confirm, a lightweight review of `ops-runbook.md` before founder go-live, and a process note to qa-manager about review-chain documentation gaps.
