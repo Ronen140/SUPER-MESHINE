@@ -13,12 +13,16 @@
 -- vault/Meeting Notes/invoicing-receipts-system.md). All eight are implemented here since the
 -- ADR, not the dispatch summary, is the source of truth.
 --
--- Whitelist note (ה): 10 functions, not the ADR's currently-written 9 —
--- `app.business_has_signing_key(uuid)` (0013_signing_key_check.sql) is a real, necessary fix
--- for a live bug (see that migration's header comment), but it is a NEW SECURITY DEFINER
--- function outside ADR-INV-001 §D3.2's closed list as currently worded. Included here
--- explicitly, commented, pending architect sign-off — not silently omitted, and not silently
--- normalized into "9" by relaxing the check.
+-- Whitelist note (ה): 10 functions — `app.business_has_signing_key(uuid)`
+-- (0013_signing_key_check.sql) is confirmed and formally approved by ADR-INV-001 Amendment
+-- C-2 (§D3.2's whitelist itself now lists 10). No longer "pending" as of this migration.
+--
+-- Check (ז) note: rewritten per Amendment C-1/C-3 — `app` now grants `USAGE` to
+-- `authenticated` (0015_amendment_c.sql reverses Amendment B-3's since-retracted ban on
+-- that), so the real control is purely `EXECUTE`, narrowed to exactly three functions
+-- (`current_business_ids`, `has_role`, and now `compute_line`) and, per C-3, extended to also
+-- assert `anon` has none of them either (previously this check only covered
+-- `authenticated`).
 
 \set ON_ERROR_STOP on
 
@@ -136,19 +140,30 @@ begin
   end if;
 end $$;
 
--- (ז) EXECUTE on schema app granted to authenticated beyond the two RLS-policy helper functions
+-- (ז) EXECUTE on schema app: authenticated limited to the three ADR-sanctioned functions
+-- (Amendment C-1 — app.compute_line() joined current_business_ids()/has_role() once `app`
+-- gained `grant usage on schema app to authenticated`), anon granted none at all (extended
+-- scope per Amendment C-3 — previously this check only covered authenticated).
 do $$
 declare v_bad text;
 begin
-  select string_agg(p.oid::regprocedure::text, ', ') into v_bad
-  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'app' and has_function_privilege('authenticated', p.oid, 'execute')
-    and p.oid not in (
-      to_regprocedure('app.current_business_ids()'),
-      to_regprocedure('app.has_role(uuid, public.member_role[])')
+  with allowed_for_authenticated(oid) as (
+    values
+      (to_regprocedure('app.current_business_ids()')),
+      (to_regprocedure('app.has_role(uuid, public.member_role[])')),
+      (to_regprocedure('app.compute_line(numeric, numeric, numeric, public.vat_treatment, numeric)'))
+  )
+  select string_agg(p.oid::regprocedure::text || ' (' || r.rolname || ')', ', ') into v_bad
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  cross join (values ('authenticated'), ('anon')) as r(rolname)
+  where n.nspname = 'app' and has_function_privilege(r.rolname, p.oid, 'execute')
+    and not (
+      r.rolname = 'authenticated'
+      and p.oid in (select oid from allowed_for_authenticated where oid is not null)
     );
   if v_bad is not null then
-    raise exception '(ז) app function(s) with EXECUTE granted to authenticated beyond the two policy helpers: %', v_bad;
+    raise exception '(ז) app function(s) with unexpected EXECUTE grants: %', v_bad;
   end if;
 end $$;
 
