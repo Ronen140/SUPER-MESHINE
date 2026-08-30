@@ -2,7 +2,7 @@
 
 ## Overview
 
-פרויקט חדש שהמייסד ביקש לפתוח: מערכת חשבוניות וקבלות **רב-עסקית** למייסד ולחבריו — מספר עסקים נפרדים (עוסק פטור + עוסק מורשה לפחות) במערכת אחת, חינמית לתפעול. ליבה: קבלות לעוסק פטור, חשבונית מס / מס-קבלה / זיכוי לעוסק מורשה, קטלוג פריטי עבודה עם סכום פתוח עד הפקה, מצב טיוטה→הפקה עם נעילה ומספור רציף, ייצוא לרו"ח. נפח צפוי זעום (~2 מסמכים/חודש לעסק). הפרויקט יושב ב-`invoicing-receipts/` בשורש הריפו (מחוץ ל-pnpm workspace). תוכנית פיתוח מלאה ב-`docs/plan.md`; **הארכיטקטורה נקבעה ב-3 ADRs ב-`invoicing-receipts/docs/adr/`** — כל שלושת ה-ADRs (INV-001/002/003) הם **Accepted** לבניית Phase 0 (ADR-INV-001 גם **Amended**). Phase 0 בביצוע לפי `vault/Engineering/invoicing-phase-0-plan.md` (18 subtasks לאחר Revision 1-2): **B1-B4 בוצעו ואומתו** (scaffold + migrations `0001_extensions`, `0002_enums`, `0003_core_tables`, `0004_document_tables` — 15 טבלאות, 9 enums); B5-B14 (RLS ואילך, migrations `0005`-`0011`) ו-F1-F4 (frontend) טרם בוצעו.
+פרויקט חדש שהמייסד ביקש לפתוח: מערכת חשבוניות וקבלות **רב-עסקית** למייסד ולחבריו — מספר עסקים נפרדים (עוסק פטור + עוסק מורשה לפחות) במערכת אחת, חינמית לתפעול. ליבה: קבלות לעוסק פטור, חשבונית מס / מס-קבלה / זיכוי לעוסק מורשה, קטלוג פריטי עבודה עם סכום פתוח עד הפקה, מצב טיוטה→הפקה עם נעילה ומספור רציף, ייצוא לרו"ח. נפח צפוי זעום (~2 מסמכים/חודש לעסק). הפרויקט יושב ב-`invoicing-receipts/` בשורש הריפו (מחוץ ל-pnpm workspace). תוכנית פיתוח מלאה ב-`docs/plan.md`; **הארכיטקטורה נקבעה ב-3 ADRs ב-`invoicing-receipts/docs/adr/`** — כל שלושת ה-ADRs (INV-001/002/003) הם **Accepted** לבניית Phase 0 (ADR-INV-001 גם **Amended**). Phase 0 בביצוע לפי `vault/Engineering/invoicing-phase-0-plan.md` (18 subtasks, כיום ב-Revision 3): **B1-B4 בוצעו ואומתו** (scaffold + migrations בפועל בדיסק: `0001_extensions.sql`, `0002_enums.sql`, `0003a_core_tables.sql`, `0003b_document_tables.sql` — 15 טבלאות, 9 enums; **הערה:** דווח פעם אחת בטעות כ-`0003_core_tables.sql`/`0004_document_tables.sql`, תוקן ע"י אימות ישיר מול הדיסק). B5-B14 (RLS ואילך, migrations `0004`-`0010`) ו-F1-F4 (frontend) טרם בוצעו.
 
 ## Open Questions
 
@@ -15,7 +15,7 @@
 - לוח ספי מספר ההקצאה (10,000 ₪ מ-1.1.2026, 5,000 ₪ מ-1.6.2026) אומת ממקורות משניים בלבד — לאמת מול gov.il לפני Phase 2; תהליך ההרשמה ל-API רשות המסים טרם נחקר.
 - מיצוב ארוך-טווח: כלי פרטי לחבורה או גרעין מודול Billing של SUPER-MESHINE? (לא חוסם MVP. אם כן — יידרש יישור מול ADR-002 שאין בו many-to-many של user↔tenant, ומול ADR-006 בגלל ה-audit ב-triggers בלבד.)
 - קודי הצבע המדויקים של Morning לא אומתו (אתר חסום ב-proxy) — לא חוסם.
-- **⚠️ אין Docker בסביבת הפיתוח בפועל (לא רק שאלת-CI, אושר תוך ביצוע B1-B4):** `dockerd` לא עולה (הרשאות `ulimit`); `supabase start` לא רץ. migrations 0001-0004 אומתו מול Postgres 16 מקומי + stub ידני זמני ל-`auth.users`/`auth.uid()` (לא ל-commit). **B5 (הבא בתור) תלויה ב-`auth.uid()` נכון per-session, לא רק בקיום טבלה** — stub הטבלה שהספיק ל-B1-B4 כנראה לא יספיק. אותה שאלה חוזרת ב-CI runner (B13). מתועד בפירוט ב-`vault/Engineering/invoicing-phase-0-plan.md` §Open Questions #3.
+- **⚠️ אין Docker בסביבת הפיתוח בפועל (לא רק שאלת-CI, אושר תוך ביצוע B1-B4):** `dockerd` לא עולה (הרשאות `ulimit`); `supabase start` לא רץ. migrations `0001`-`0003b` אומתו מול Postgres 16 מקומי + stub ידני זמני ל-`auth.users`/`auth.uid()` (לא ל-commit). **B5 (הבא בתור, migration `0004_rls_helpers`) תלויה ב-`auth.uid()` נכון per-session, לא רק בקיום טבלה** — stub הטבלה שהספיק ל-B1-B4 כנראה לא יספיק. אותה שאלה חוזרת ב-CI runner (B13). מתועד בפירוט ב-`vault/Engineering/invoicing-phase-0-plan.md` §Open Questions #3.
 
 ## Session Log
 
@@ -97,6 +97,7 @@
   - **B2:** `0001_extensions.sql` (`pgcrypto`, `citext`), `0002_enums.sql` (9 enums) + down מקבילים.
   - **B3:** `0003_core_tables.sql` — 8 טבלאות (`users`+auth-sync trigger, `vat_rates`+seed, `businesses`, `business_members`+owner-guard trigger, `business_signing_keys`, `customers`, `items`, `customer_document_consents`) + `set_updated_at()` על businesses/customers/items. **כולל גם `businesses_protect_identity_trg`** (חוסם שינוי `created_by`/`tax_id`/`entity_type`) — נדרש ע"י Amendment A §D3.1 שהתפרסם *תוך כדי* עבודת ה-batch הזה; RLS/create_business() עצמם (שאר Amendment A) נשארו מחוץ ל-scope.
   - **B4:** `0004_document_tables.sql` — 7 טבלאות (`documents` עם `signed_total` generated column, `document_lines`, `payments`, `document_counters`, `allocation_requests`, `document_public_links`, `audit_log`). **ללא שום RLS statement**, כולל עבור `business_signing_keys`/`document_counters`/`audit_log` שה-ADR מציג את ה-RLS שלהן inline בסקשן ה-Schema — הוחלט להעביר את כל ה-RLS (enable/force/policies) ל-migration אטומית אחת מאוחרת יותר, כי `counters_read` היה תלוי בפונקציית `app.current_business_ids()` שטרם קיימת.
+  - **⚠️ תיקון מאוחר (ראה session הבא):** שמות הקבצים בפועל, כפי שאומתו ישירות מול הדיסק ע"י ה-CEO, הם **`0003a_core_tables.sql`** ו-**`0003b_document_tables.sql`** — לא `0003_core_tables.sql`/`0004_document_tables.sql` כפי שדווח כאן. ייתכן שדווח מצב-ביניים לפני ששמות הקבצים סוכמו סופית. משאיר את הרשומה המקורית כפי שנכתבה (ללא שכתוב) לפי פרוטוקול ה-vault — התיקון העובדתי מתועד ברשומה הבאה.
 - **Decisions:**
   - מספור המיגרציות (`0001`-`0004`) עוקב אחרי חלוקת המשימות של ה-EM (שפיצל את "0003_core_tables" ל-B3+B4 בתור **שני קבצים רציפים**), **לא** אחרי המספור המקורי ב-ADR-INV-001 §Implementation Notes (שם 0003 מכיל את כל הטבלאות ו-0004 הוא RLS helpers). אין סתירה מהותית — רק היסט מספרי; מתועד בראש כל קובץ מיגרציה **ותוקן בהמשך ב-plan file** (ראה session הבא).
   - `updated_at` על `businesses`/`customers`/`items`: נבחר trigger plpgsql פשוט (`public.set_updated_at()`) במקום extension `moddatetime` שה-ADR מזכיר ב-Implementation Note #4 — נמנע תלות ב-extension נוספת לעמודה אחת לטבלה; אותה תוצאה פונקציונלית.
@@ -128,4 +129,13 @@
   - **⚠️ הועלה סיכון חדש, לא architect-level:** B5 (הבא בתור) היא הראשונה שתלויה ב-`auth.uid()` נכון per-session, לא רק בקיום שורה ב-`auth.users` — ה-stub הפשוט שהספיק ל-B1-B4 עלול לא להספיק. אין Docker בסביבה (גם לא ב-CI כנראה) — backend-builder חייב לפתור זאת (למשל `set_config('request.jwt.claims',...)`+`auth.uid()` תואם) ולתעד לפני שממשיך.
   - commit `wip` אוטומטי (`416c9bc`) מ-checkpoint mechanism — עדיין דורש תשומת לב CEO לפני push סופי.
   - אין escalation פתוח נוסף לארכיטקט. אין escalation חוסם ל-CEO/מייסד.
+- **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]]
+
+### 2026-08-30 — CEO factual correction: actual migration files are 0003a/0003b, not 0003/0004 [done]
+- **What was done:** ה-CEO בדק ישירות בדיסק (`ls supabase/migrations/`) ובקומיט ותיקן: הקבצים בפועל הם **`0003a_core_tables.sql`** ו-**`0003b_document_tables.sql`** — בדיוק כפי שתוכנן ב-Revision 1 — ולא `0003_core_tables.sql`/`0004_document_tables.sql` כפי שהבנתי (בטעות) ב-Revision 2 מתוך ניסוח ב-session log הקודם. עדכנתי את `vault/Engineering/invoicing-phase-0-plan.md` ל-**Revision 3**: ביטלתי את כל ההזחה שביצעתי ב-Revision 2 והחזרתי את מספור B5-B10 בדיוק למה שנקבע ב-Revision 1 (`0004_rls_helpers`, `0005_rls_policies`, `0006_audit`, `0007_immutability`, `0008_issue_function`, `0009_create_business`, `0010_storage_buckets`).
+- **Decisions:** אין החלטה חדשה מהותית — זהו תיקון עובדתי גרידא לשמות קבצים; ה-scope/AC/dependencies של כל subtask נשארו בדיוק כפי שהיו ב-Revision 1 (Amendment A).
+- **Notes / Caveats:**
+  - **לקח מצטבר (זו הפעם השלישית שמתגלה drift בסבב הזה):** מקור האמת היחיד למספור/שמות קבצים בפועל הוא הדיסק/git (`ls`, `git show`) — לא תיאור טקסטואלי בתוך vault session log, ולא הנחה מדיספאץ' קודם. Revision 2 שלי נכשלה בדיוק כי הסתמכתי על נוסח לא-חד-משמעי ("קובץ יחיד") בלי לוודא ישירות.
+  - הרשומה ההיסטורית של "Phase 0 Batch 1" למעלה **לא נערכה מחדש** לפי פרוטוקול ה-vault (לא לשכתב היסטוריה) — כוללת הערת-אזהרה מוטמעת המפנה לתיקון כאן.
+  - אין escalation פתוח לארכיטקט או ל-CEO/מייסד. B5 (`0004_rls_helpers.sql`) מוכנה לדיספאץ' הבא, ללא חסימה.
 - **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]]
