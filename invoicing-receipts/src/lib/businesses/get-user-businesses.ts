@@ -21,19 +21,24 @@ export type BusinessListItem = {
  * query instead of two.
  */
 export const getUserBusinesses = cache(async (): Promise<BusinessListItem[]> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("businesses")
-    .select("id, legal_name, display_name, entity_type, accent_color")
-    .order("created_at", { ascending: true });
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("businesses")
+      .select("id, legal_name, display_name, entity_type, accent_color")
+      .order("created_at", { ascending: true });
 
-  if (error) {
+    if (error) {
+      console.error("[get-user-businesses] failed to load businesses:", error);
+      return [];
+    }
+
+    return data ?? [];
+  } catch (err) {
     // No live Supabase project yet in this environment (or a real outage) —
     // fail to an empty list rather than crashing the whole app shell. The
     // switcher/dashboard already handle a zero-business state.
-    console.error("[get-user-businesses] failed to load businesses:", error);
+    console.error("[get-user-businesses] failed to load businesses:", err);
     return [];
   }
-
-  return data ?? [];
 });
