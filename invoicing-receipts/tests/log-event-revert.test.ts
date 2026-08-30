@@ -55,7 +55,10 @@ describe("0017_log_event_revert — service_role can no longer call public.log_e
 
   it("an authenticated non-member is still rejected with INV_FORBIDDEN (unchanged by the revert)", async () => {
     const strangerId = randomUUID();
-    await runSql(db, `insert into auth.users (id, email) values ('${strangerId}', 'stranger-${strangerId}@test.local');`);
+    await runSql(
+      db,
+      `insert into auth.users (id, email) values ('${strangerId}', 'stranger-${strangerId}@test.local');`,
+    );
 
     await expect(
       runSql(

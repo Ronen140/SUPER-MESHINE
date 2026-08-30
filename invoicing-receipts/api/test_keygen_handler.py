@@ -48,7 +48,7 @@ def test_successful_request_inserts_and_returns_only_non_sensitive_metadata(mock
     assert "not_after" in result
     assert "private_key" not in json.dumps(result)
 
-    # exactly two calls: the INSERT, then the audit log_event RPC.
+    # exactly two calls: the business_signing_keys INSERT, then the direct audit_log INSERT.
     assert mock_urlopen.call_count == 2
     insert_request = mock_urlopen.call_args_list[0][0][0]
     assert insert_request.full_url == "https://example.supabase.co/rest/v1/business_signing_keys"
@@ -56,29 +56,39 @@ def test_successful_request_inserts_and_returns_only_non_sensitive_metadata(mock
 
 
 @patch("keygen.urllib.request.urlopen")
-def test_successful_request_logs_a_key_create_audit_event_via_log_event(mock_urlopen):
+def test_successful_request_writes_a_key_create_audit_log_row_directly(mock_urlopen):
     """code-quality review (Batch 3, 🔴): business_signing_keys writes were not audited at
-    all — CLAUDE.md invariant #2. Fixed by calling public.log_event() (0016) right after the
-    INSERT, via the same service_role key (PostgREST RPC, not a direct DB connection)."""
+    all — CLAUDE.md invariant #2. 0016 first fixed this via a public.log_event() RPC call
+    extended to accept service_role; the architect reverted that extension
+    (0017_log_event_revert.sql) — service_role already has BYPASSRLS and can INSERT into
+    audit_log directly, exactly like public.create_business() already does. This writes that
+    row directly instead of calling the RPC."""
     mock_urlopen.return_value = _mock_response(201)
 
     generate_and_store_signing_key(VALID_PAYLOAD)
 
-    log_event_request = mock_urlopen.call_args_list[1][0][0]
-    assert log_event_request.full_url == "https://example.supabase.co/rest/v1/rpc/log_event"
-    assert log_event_request.get_header("Authorization") == "Bearer test-service-role-key"
+    audit_request = mock_urlopen.call_args_list[1][0][0]
+    assert audit_request.full_url == "https://example.supabase.co/rest/v1/audit_log"
+    assert audit_request.get_header("Authorization") == "Bearer test-service-role-key"
 
-    body = json.loads(log_event_request.data)
-    assert body["p_business_id"] == VALID_PAYLOAD["business_id"]
-    assert body["p_action"] == "key_create"
-    assert body["p_table_name"] == "business_signing_keys"
+    body = json.loads(audit_request.data)
+    assert body["business_id"] == VALID_PAYLOAD["business_id"]
+    assert body["actor_type"] == "service"
+    assert body["actor_id"] is None
+    assert body["action"] == "key_create"
+    assert body["table_name"] == "business_signing_keys"
+    assert body["record_id"]  # the generated business_signing_keys.id, not null
+    assert body["after_data"] == {
+        "certificate_serial": body["after_data"]["certificate_serial"],
+        "kek_id": body["after_data"]["kek_id"],
+    }
     # never the private key / ciphertext — only non-sensitive metadata.
     assert "private_key" not in json.dumps(body)
     assert "ciphertext" not in json.dumps(body)
 
 
 @patch("keygen.urllib.request.urlopen")
-def test_a_log_event_failure_does_not_fail_the_overall_keygen_request(mock_urlopen):
+def test_an_audit_log_insert_failure_does_not_fail_the_overall_keygen_request(mock_urlopen):
     """The signing key itself was already durably written — a failure auditing that fact is
     a (loggable server-side) problem, not a reason to report failure for a request that, from
     the caller's point of view, already succeeded."""
@@ -86,7 +96,7 @@ def test_a_log_event_failure_does_not_fail_the_overall_keygen_request(mock_urlop
 
     mock_urlopen.side_effect = [
         _mock_response(201),  # the business_signing_keys INSERT succeeds
-        urllib.error.URLError("connection refused"),  # the log_event call fails
+        urllib.error.URLError("connection refused"),  # the audit_log insert fails
     ]
 
     result = generate_and_store_signing_key(VALID_PAYLOAD)
