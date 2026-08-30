@@ -7,10 +7,16 @@
  * - 0006_audit.sql          — audit_log immutability
  * - 0007_immutability.sql   — ADR-INV-002 §D3 document/child-row/allocation immutability
  * - 0008_issue_function.sql — ADR-INV-002 §D2 app.issue_document() validation sequence
+ *   (this function moved to public.issue_document() in 0009_amendments.sql — same codes;
+ *   0008's app.issue_document() body is restored verbatim if 0009 is ever rolled back, so
+ *   INV_CREDIT_OF_CREDIT stays mapped even though 0009's forward path raises
+ *   INV_CREDIT_PARENT_TYPE instead for the equivalent case).
+ * - 0009_amendments.sql     — ADR-INV-002 Amendment A-2 (credit parent type),
+ *   ADR-INV-001 Amendment B-2 (public.issue_document/set_start_number, same INV_* codes)
  *
- * B9 (app.create_business()) will extend this map with INV_UNAUTHENTICATED, INV_NO_PROFILE,
- * INV_BUSINESS_LIMIT, INV_BAD_TAX_ID, INV_TAX_ID_EXISTS — not added yet, out of this batch's
- * scope (see vault/Engineering/invoicing-phase-0-plan.md, B9).
+ * B9 (public.create_business()) will extend this map with INV_UNAUTHENTICATED,
+ * INV_NO_PROFILE, INV_BUSINESS_LIMIT, INV_BAD_TAX_ID, INV_TAX_ID_EXISTS — not added yet, out
+ * of this batch's scope (see vault/Engineering/invoicing-phase-0-plan.md, now migration 0010).
  *
  * A handful of these codes are not named verbatim anywhere in ADR-INV-001/002's short lists
  * (INV_DOCUMENT_NOT_FOUND, INV_FORBIDDEN, INV_NO_LINES, INV_CUSTOMER_REQUIRED,
@@ -45,6 +51,8 @@ export const INV_ERROR_MESSAGES: Record<string, string> = {
   INV_TYPE_NOT_ALLOWED: "סוג מסמך זה אינו מותר עבור סוג העסק שלך.",
   INV_CREDIT_NEEDS_PARENT: "מסמך זיכוי חייב להיות מקושר למסמך אב מופק, עם נימוק זיכוי.",
   INV_CREDIT_OF_CREDIT: "לא ניתן להפיק מסמך זיכוי כנגד מסמך זיכוי אחר.",
+  INV_CREDIT_PARENT_TYPE:
+    "ניתן להפיק זיכוי רק כנגד קבלה, חשבונית מס או חשבונית מס-קבלה — לא כנגד הצעת מחיר או חשבונית עסקה.",
   INV_CREDIT_EXCEEDS_PARENT: "סכום הזיכוי חורג מהיתרה שנותרה במסמך האב.",
   INV_PAYMENTS_MISMATCH: "סכום התקבולים אינו תואם את הסכום לתשלום במסמך.",
   INV_NO_VAT_RATE: 'לא נמצא שיעור מע"מ בתוקף לתאריך ההפקה.',

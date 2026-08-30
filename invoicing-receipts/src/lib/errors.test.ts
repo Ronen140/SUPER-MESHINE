@@ -14,6 +14,14 @@ describe("toUserMessage", () => {
     );
   });
 
+  it("maps INV_CREDIT_PARENT_TYPE (ADR-INV-002 Amendment A-2) to its Hebrew message", () => {
+    expect(
+      toUserMessage("INV_CREDIT_PARENT_TYPE: cannot credit a document of type price_quote"),
+    ).toBe(
+      "ניתן להפיק זיכוי רק כנגד קבלה, חשבונית מס או חשבונית מס-קבלה — לא כנגד הצעת מחיר או חשבונית עסקה.",
+    );
+  });
+
   it("falls back to a generic Hebrew message for an unrecognized INV_* code", () => {
     expect(toUserMessage("INV_SOMETHING_NEW_NOT_YET_MAPPED: detail")).toBe(
       "אירעה שגיאה בלתי צפויה. נסו שוב, ואם הבעיה חוזרת פנו לתמיכה.",

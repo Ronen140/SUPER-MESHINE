@@ -2,7 +2,7 @@
 
 ## Overview
 
-פרויקט חדש שהמייסד ביקש לפתוח: מערכת חשבוניות וקבלות **רב-עסקית** למייסד ולחבריו — מספר עסקים נפרדים (עוסק פטור + עוסק מורשה לפחות) במערכת אחת, חינמית לתפעול. ליבה: קבלות לעוסק פטור, חשבונית מס / מס-קבלה / זיכוי לעוסק מורשה, קטלוג פריטי עבודה עם סכום פתוח עד הפקה, מצב טיוטה→הפקה עם נעילה ומספור רציף, ייצוא לרו"ח. נפח צפוי זעום (~2 מסמכים/חודש לעסק). הפרויקט יושב ב-`invoicing-receipts/` בשורש הריפו (מחוץ ל-pnpm workspace). תוכנית פיתוח מלאה ב-`docs/plan.md`; **הארכיטקטורה נקבעה ב-3 ADRs ב-`invoicing-receipts/docs/adr/`** — כל שלושת ה-ADRs (INV-001/002/003) הם **Accepted** לבניית Phase 0 (**ADR-INV-001 Amended ×2: A, B** · **ADR-INV-002 Amended ×1: A**). Phase 0 בביצוע לפי `vault/Engineering/invoicing-phase-0-plan.md` (18 subtasks, Revision 3): **B1-B4 בוצעו ואומתו** (scaffold + migrations `0001_extensions.sql`, `0002_enums.sql`, `0003a_core_tables.sql`, `0003b_document_tables.sql` — 15 טבלאות, 9 enums). **F1-F2 בוצעו ואומתו** (app shell + auth flow). **B5-B8 בוצעו** (`0004_rls_helpers.sql` עד `0008_issue_function.sql`) אך **טרם התקבלו ב-acceptance** — שרשרת ה-QA העלתה פגם 🔴 (השורות אינן מוקפאות בהפקה) שהוכרע ב-ADR-INV-002 Amendment A ודורש עבודת תיקון לפני סגירת Batch 2.
+פרויקט חדש שהמייסד ביקש לפתוח: מערכת חשבוניות וקבלות **רב-עסקית** למייסד ולחבריו — מספר עסקים נפרדים (עוסק פטור + עוסק מורשה לפחות) במערכת אחת, חינמית לתפעול. ליבה: קבלות לעוסק פטור, חשבונית מס / מס-קבלה / זיכוי לעוסק מורשה, קטלוג פריטי עבודה עם סכום פתוח עד הפקה, מצב טיוטה→הפקה עם נעילה ומספור רציף, ייצוא לרו"ח. נפח צפוי זעום (~2 מסמכים/חודש לעסק). הפרויקט יושב ב-`invoicing-receipts/` בשורש הריפו (מחוץ ל-pnpm workspace). תוכנית פיתוח מלאה ב-`docs/plan.md`; **הארכיטקטורה נקבעה ב-3 ADRs ב-`invoicing-receipts/docs/adr/`** — כל שלושת ה-ADRs (INV-001/002/003) הם **Accepted** לבניית Phase 0 (**ADR-INV-001 Amended ×2: A, B** · **ADR-INV-002 Amended ×1: A**). Phase 0 בביצוע לפי `vault/Engineering/invoicing-phase-0-plan.md` (18 subtasks, Revision 3): **B1-B4 בוצעו ואומתו** (scaffold + migrations `0001_extensions.sql`, `0002_enums.sql`, `0003a_core_tables.sql`, `0003b_document_tables.sql` — 15 טבלאות, 9 enums). **F1-F2 בוצעו ואומתו** (app shell + auth flow). **B5-B8 בוצעו** (`0004_rls_helpers.sql` עד `0008_issue_function.sql`). **תיקון ה-QA (🔴 השורות לא מוקפאות בהפקה) בוצע ואומת**: migration חדשה **`0009_amendments.sql`** (+down) מיישמת את ADR-INV-002 Amendment A (§D8 — `app.compute_line()`, trigger מחשב על `document_lines`, CHECK `line_total=line_net+line_vat`, שלב 6א ב-`issue_document()`, `INV_CREDIT_PARENT_TYPE`, `updated_at` על `documents`) ואת שני הפריטים הרלוונטיים מ-ADR-INV-001 Amendment B (§D3.3 — `public.issue_document`/`public.set_start_number`, לא `app.*`). 0007/0008 לא נערכו (drop+create ב-migration חדש, כפי שה-ADR מורה). **B9 (`create_business`) זז ל-migration `0010`** (במקום `0009`). B9-B14 טרם בוצעו.
 
 ## Open Questions
 
@@ -22,12 +22,15 @@
 - **היקף i18n (F1-F2):** יושם עברית בלבד (`dir="rtl" lang="he"` גלובלי, ללא ניתוב locale) — לא next-intl/routing דו-לשוני. החלטה מכוונת: כלי פנימי למייסד ולחבריו; אם זה משתנה, נדרש routing מלא לפני שיתווספו עוד מסכים.
 - ~~**פער: `public.handle_new_auth_user()` אינו ב-whitelist של Amendment A**~~ — **נפתר ב-Amendment B (B-1).** נוסף ל-whitelist, שגדל מ-7 ל-9 פונקציות; נשאר ב-`public` מסיבה טכנית מנומקת (§D3.3).
 - ~~**פער: פונקציות ב-schema `app` בלתי-קריאות דרך `supabase.rpc()`**~~ — **נפתר ב-Amendment B (B-2).** חוזה ה-RPC עובר ל-`public`; `app` נשאר internals ולא ייחשף ל-PostgREST לעולם.
-- ~~**🔴 פגם: `issue_document()` לא מקפיאה את ערכי השורות**~~ — **נפתר ב-ADR-INV-002 Amendment A (A-1).** שלוש שכבות: trigger מחשב על `document_lines`, חישוב חוזר בהפקה, CHECK של עקביות פנימית. דורש **עבודת תיקון בפועל** לפני acceptance של Batch 2.
-- **⚠️ נגזרות פתוחות ל-EM (משני ה-Amendments):**
-  1. המיגרציות `0004`-`0008` מגדירות את `issue_document`/`set_start_number` ב-`app`. נדרש **migration מתקן חדש** (`ALTER FUNCTION ... SET SCHEMA public` + grants), לא עריכה של קובץ שכבר בוצע.
-  2. לוודא ש-`app.documents_set_entity_type()`, `app.allocation_requests_locked()`, `app.child_rows_locked()`, `app.documents_immutable()`, `app.audit_log_immutable()` ו-`app.seed_for()` הן **`SECURITY INVOKER`**, אחרת בדיקת CI (ה) תיפול עליהן ב-B13.
-  3. **חדש:** `app.compute_line()` + trigger `app.document_lines_compute()` + `check (line_total = line_net + line_vat)` + שלב 6א ב-`issue_document()` + trigger `set_updated_at` על `documents` — כולם migration מתקן חדש, לא עריכה של `0007`/`0008`.
-  4. **חדש, ל-frontend:** העורך **אינו מחשב סכומים**. כל חישוב כספי ב-JS הוא באג — שולחים קלט גולמי וקוראים בחזרה מחושב. משפיע על F4 ועל עורך המסמכים ב-Phase 1.
+- ~~**🔴 פגם: `issue_document()` לא מקפיאה את ערכי השורות**~~ — **נפתר ב-ADR-INV-002 Amendment A (A-1), מיושם ומאומת ב-`0009_amendments.sql`.** שלוש שכבות: trigger מחשב על `document_lines`, חישוב חוזר בהפקה (שלב 6א), CHECK של עקביות פנימית. "foots" (`sum(line_total)=total_amount`) אומת על כל 6 סוגי המסמכים.
+- ~~**נגזרות ל-EM (משני ה-Amendments)**~~ — **כולן בוצעו ב-`0009_amendments.sql`:**
+  1. ~~`issue_document`/`set_start_number` ב-`app`~~ → הועברו ל-`public` (drop+create ב-migration חדש, `0007`/`0008` לא נערכו).
+  2. ~~לוודא `SECURITY INVOKER`~~ → אומת ישירות מול `pg_proc.prosecdef` על כל 10 הפונקציות שאינן ברשימת ה-9: כולן `f` (invoker), כולל 3 הפונקציות החדשות (`compute_line`, `document_lines_compute`, `recompute_draft_lines`).
+  3. ~~`app.compute_line()` + trigger + CHECK + שלב 6א + `set_updated_at`~~ → כולם ב-`0009_amendments.sql`, מאומתים (ראו session log).
+  4. **עדיין פתוח, ל-frontend:** העורך **אינו מחשב סכומים** — שולחים קלט גולמי, קוראים בחזרה מחושב. משפיע על F4 ועל עורך המסמכים ב-Phase 1.
+- **⚠️ שני ממצאים חדשים מ-`0009_amendments.sql` (תועדו בקוד המיגרציה עצמה, לא רק כאן):**
+  1. **`SET search_path=''` על `public.issue_document()` שבר את `0007`'s `app.child_rows_locked()`** (`v_status document_status;` ללא schema prefix) ברגע שהפונקציה הראשונה קוראת ל-trigger של השנייה בתוך אותה קריאת DML — התגלה רק בהרצה בפועל (`type "document_status" does not exist`), לא בבדיקת קומפילציה סטטית. **הפתרון:** helper `app.recompute_draft_lines()` חדש עם `search_path=public,pg_temp` רגיל, שמבודד את ה-DML הרגיש הזה בלי לגעת ב-`0007`. שווה ל-erp-domain-expert/architect לדעת לקראת מיגרציות עתידיות שגם הן יזדקקו ל-search_path='' ליד קוד ישן.
+  2. **סטייה מתועדת מנוסח ה-ADR ל-layer 1 של D8:** "coalesce(parent.vat_rate, השיעור בתוקף היום)" הוא לוגית dead-code — `documents.vat_rate` הוא `not null default 0`, ומאחר ש-`document_lines_compute()` רץ אך ורק על טיוטות (child_rows_locked חוסם אחרת), `parent.vat_rate` הוא **תמיד** 0 עד ההפקה. יישום מילולי היה מציג 0% מע"מ בכל תצוגה מקדימה למורשה, עד רגע ההפקה. מומש כ"תמיד השיעור בתוקף היום" (או `app.issuing_as_of` בזמן הפקה) — משרת את מטרת ה-layer בפועל. **טעון אישור ארכיטקט**, לא הוכרע חד-צדדית.
 
 ## Session Log
 
@@ -226,3 +229,31 @@
   - נוספו 6 בדיקות DoD חדשות (§Implementation Notes #4), ובראשן בדיקת ה-"foots" הקנונית: `sum(line_total) = documents.total_amount` על כל אחד מששת סוגי המסמכים.
   - **Batch 2 אינו מתקבל ב-acceptance עד שהתיקון מיושם ומאומת.** אין escalation פתוח לארכיטקט.
 - **Related:** [[invoicing-phase-0-plan]], [[002-immutability-and-numbering]], [[003-pdf-signing-storage]], [[001-data-model-and-rls]]
+
+### 2026-08-30 — Batch 2 fix round: 0009_amendments.sql (ADR-INV-002 Amendment A + ADR-INV-001 Amendment B) [done]
+- **What was done:** backend-builder יישם את שני ה-Amendments במיגרציה מתקנת חדשה — `invoicing-receipts/supabase/migrations/0009_amendments.sql` (+down). `0007_immutability.sql`/`0008_issue_function.sql` **לא נערכו** — `app.issue_document`/`app.set_start_number` נמחקו (`drop function`) ונוצרו מחדש כ-`public.issue_document`/`public.set_start_number`, וה-down משחזר את הגרסה המקורית של `0008` ב-`app` במדויק.
+  - **`app.compute_line()`** — מקור האמת היחיד לחישוב שורה (ADR-INV-002 §D8), עם הערת האזהרה המדויקת שהארכיטקט דרש.
+  - **`app.document_lines_compute()`** — trigger `BEFORE INSERT OR UPDATE ON document_lines` (שם `lines_values_compute_trg`, נבחר לסדר אלפביתי **אחרי** `lines_locked_trg` מ-`0007` בכוונה) — מחשב ודורס `discount_amount`/`line_net`/`line_vat`/`line_total`. משרת גם layer 1 (טיוטה, שיעור "היום") וגם layer 2 (הפקה, שיעור סמכותי) דרך GUC טרנזקציוני `app.issuing_as_of`.
+  - **`check (line_total = line_net + line_vat)`** על `document_lines`.
+  - **שלב 6א ב-`public.issue_document()`** — לפני חישוב ה-header, מפעיל מחדש את ה-trigger (דרך `app.recompute_draft_lines()`, ראו ממצא #1 למטה) עם השיעור הסמכותי מ-`issue_date`; ה-header עצמו עכשיו רק מסכם את השורות (`sum(line_net+discount_amount)`, `sum(discount_amount)`, וכו') במקום לשכפל את נוסחת `compute_line()` בשנית (כפי שעשה `0008`).
+  - **`documents_set_updated_at`** (`moddatetime`) — `before update` על `documents`, ללא סייג "רק בטיוטה".
+  - **`INV_CREDIT_PARENT_TYPE`** — `parent.type not in ('receipt','tax_invoice','tax_invoice_receipt')` מחליף את הבדיקה הצרה יותר (`INV_CREDIT_OF_CREDIT`) שהייתה ב-`0008`; נוסף ל-`src/lib/errors.ts` (TDD RED→GREEN).
+- **שני ממצאים אמיתיים נמצאו ותוקנו תוך כדי אימות:**
+  1. **`SET search_path=''` על `public.issue_document()` שבר את `app.child_rows_locked()` הישן (`0007`, ללא schema prefix על `document_status`)** ברגע שה-UPDATE של שלב 6א הפעיל את שני ה-triggers על `document_lines` באותה קריאה. שגיאה בזמן ריצה בלבד (`type "document_status" does not exist`), לא בקומפילציה. **תיקון:** helper חדש `app.recompute_draft_lines(uuid,date)` עם `search_path=public,pg_temp` רגיל, שמבודד את ה-DML הרגיש הזה — לא נגעתי ב-`0007`.
+  2. **"coalesce(parent.vat_rate, היום)" מה-ADR הוא dead-code** — `documents.vat_rate` הוא `not null default 0`, ו-`document_lines_compute()` רץ רק על טיוטות (לפני הפקה), אז `parent.vat_rate` תמיד 0 באותו שלב. מומש כ"תמיד השיעור בתוקף היום" (או `app.issuing_as_of` בזמן הפקה) — פורט כהחלטת builder-level הטעונה אישור ארכיטקט, לא הוכרע חד-צדדית.
+- **Decisions:**
+  - הוחלף חישוב ה-header ב-`issue_document()` מנוסחה כפולה (SQL גולמי שמשכפל את `compute_line()`) לסכימה ישירה של השורות שכבר חושבו מחדש — פחות קוד, אפס סיכון לפיצול לוגי בין שני מקורות.
+  - `INV_CREDIT_OF_CREDIT` נשאר ב-`errors.ts` (לא הוסר) כי `0008`'s גרסת ה-`app.issue_document` המקורית (המשוחזרת ב-down) עדיין מעלה אותו — הוא הופך ל"מת" רק בכיוון הקדימה.
+- **Verified (בפועל, DB מקומי, roundtrip מלא 0001→0009):**
+  - trigger מחשב ודורס ערכים שגויים בכוונה (INSERT); `patur` ⇒ `line_vat=0`.
+  - CHECK `line_total_consistent`: מושבת ה-trigger זמנית → UPDATE שמפר את השוויון נכשל; מופעל מחדש → אותה שורה מתוקנת אוטומטית ב-UPDATE הבא.
+  - **"foots" על כל 6 סוגי המסמכים** (`receipt`, `tax_invoice`, `tax_invoice_receipt`, `proforma_invoice`, `price_quote`, `credit_note`) — `sum(line_total) = total_amount` בדיוק, כולל כמויות שבריריות (2.5, 3, 7) ואחוזי הנחה לא-עגולים (5%, 12.5%, 15%).
+  - עיגול `compute_line()` ברמת יחידה: 3 מקרי חצי-אגורה (`3×0.555`, `7×3.335` עם הנחה 12.5%, `100.005` עם הנחה 50%) — כולם עוגלו נכון (round-half-up) ברמת השורה, וסכום השורות שווה ל-header בלי עיגול נוסף.
+  - **טיוטה שנוצרה תחת 18% ומופקת עם `issue_date` בתקופת ה-17%** (2024-06-01): גם השורה וגם ה-header עברו ל-17% — מוכיח ששלב 6א דורס את החישוב הישן.
+  - `INV_CREDIT_PARENT_TYPE` נכשל מול `price_quote` **וגם** מול `proforma_invoice`.
+  - `documents.updated_at` מתעדכן על UPDATE **גם** במסמך שכבר `issued` (נבדק עם `paid_amount`), לא רק בטיוטה.
+  - Regression: RLS cross-tenant (SELECT), FORCE (`business_signing_keys` בלבד), ו-`INV_IMMUTABLE_FIELDS` על מסמך issued — כולם עדיין עובדים אחרי השינויים.
+  - `pnpm test`/`typecheck`/`check`/`build` — exit 0 (40/40 טסטים).
+  - Down/up roundtrip מלא 0001→0009 — פעמיים (פעם ראשונה תפסה את שני הבאגים; שנייה נקייה).
+- **Notes / Caveats:** B9 (`create_business`) זז ממה שתוכנן `0009_create_business.sql` ל-**`0010_create_business.sql`** (הערה נקודתית נוספה ל-`vault/Engineering/invoicing-phase-0-plan.md`, לא Revision 4 מלאה — זו באחריות ה-EM). B-3 (הידוק ה-EXECUTE grants על `app.current_business_ids`/`app.has_role` ב-`0004`), `public.log_event()` (D11), ו-`public.create_business()` (D10) **לא** בסקופ הסבב הזה — פורטו במפורש בדיספאץ' כלא-נדרשים כרגע. לא בוצע commit.
+- **Related:** [[invoicing-phase-0-plan]], [[002-immutability-and-numbering]], [[001-data-model-and-rls]]

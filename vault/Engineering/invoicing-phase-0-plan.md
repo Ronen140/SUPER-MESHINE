@@ -2,6 +2,7 @@
 
 **Date:** 2026-08-30 14:30
 **Revised:** 2026-08-30 (Revision 1 — Amendment A מה-architect ל-ADR-INV-001 יושמה; Revision 2 — ניסיון (שגוי) ליישר מספור migrations; **Revision 3** — תיקון עובדתי מה-CEO: הקבצים בפועל הם `0003a`/`0003b`, לא `0003`/`0004` — מספור B5+ חוזר למצב Revision 1. ראו `## Plan Revisions` בתחתית הקובץ)
+**⚠️ עדכון נקודתי (2026-08-30, לא Revision מלאה — בוצע ע"י backend-builder בדיספאץ' מה-CEO, לא ע"י ה-EM):** לאחר Batch 2 (B5-B8) נכתבו שני Amendments נוספים — ADR-INV-002 Amendment A (§D8, חישוב שורות + parent-type לזיכוי) ו-ADR-INV-001 Amendment B (§D3.3, מעבר חוזה ה-RPC ל-`public`). התיקון יושם כ-migration חדשה **`0009_amendments.sql`** (לא נערכו 0007/0008). המשמעות למספור B9 ואילך: **B9 (`app.create_business`) זז ממה שתוכנן כ-`0009_create_business.sql` ל-`0010_create_business.sql`**, ובהתאמה B10 (storage buckets) → `0011`, ו-B11-B14 זזות בהתאם ב-+1. פירוט מלא + verification ב-`vault/Meeting Notes/invoicing-receipts-system.md` (session "Phase 0 Batch 2 fix round"). **טרם בוצע Revision 4 פורמלי** של תוכנית ה-EM עם כל ה-AC/spec המעודכנים ל-B9-B14 — זה נשאר לסבב תכנון הבא.
 **Project:** `invoicing-receipts/` — independent pnpm project, outside the SUPER-MESHINE ERP workspace.
 
 **Source task (CEO brief, verbatim):**
