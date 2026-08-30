@@ -25,6 +25,8 @@ exactly as named without repurposing any of them.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import dataclasses
 import datetime
 import hashlib
@@ -140,16 +142,19 @@ def envelope_decrypt_private_key(envelope: SigningKeyEnvelope, *, kek: bytes) ->
 
 
 def kek_from_env() -> tuple[bytes, str]:
-    """Reads the KEK from `SIGNING_MASTER_KEK_V1` (ADR-INV-003 §D4 — 32 raw bytes, hex-encoded
-    in the env var; Vercel Environment Variables, marked Sensitive, never in Supabase). The
-    env var's own name doubles as `kek_id` so a future rotation (`SIGNING_MASTER_KEK_V2`)
-    only requires adding a new env var and reading it as of the next key generated — every
-    existing row keeps working via its own recorded `kek_id`."""
+    """Reads the KEK from `SIGNING_MASTER_KEK_V1` (ADR-INV-003 §D4 — "KEK = base64(32B)":
+    32 raw bytes, base64-encoded in the env var; Vercel Environment Variables, marked
+    Sensitive, never in Supabase). The env var's own name doubles as `kek_id` so a future
+    rotation (`SIGNING_MASTER_KEK_V2`) only requires adding a new env var and reading it as of
+    the next key generated — every existing row keeps working via its own recorded `kek_id`."""
     env_name = "SIGNING_MASTER_KEK_V1"
     raw = os.environ.get(env_name)
     if not raw:
         raise RuntimeError(f"{env_name} is not set — cannot generate a signing key")
-    kek = bytes.fromhex(raw)
+    try:
+        kek = base64.b64decode(raw, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise RuntimeError(f"{env_name} is not valid base64") from error
     if len(kek) != _AES_KEY_SIZE_BYTES:
         raise RuntimeError(f"{env_name} must decode to exactly {_AES_KEY_SIZE_BYTES} bytes")
     return kek, env_name

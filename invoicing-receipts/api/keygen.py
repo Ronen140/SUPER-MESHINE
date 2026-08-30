@@ -10,11 +10,20 @@ exists), not a broken one.
 
 Uses only Python's standard library beyond `cryptography` (already required by ADR-INV-003
 §D4 itself for RSA/X.509/AES-GCM — there is no stdlib substitute for any of those) to reach
-Supabase: a single `POST .../rest/v1/business_signing_keys` via `urllib.request`, using the
+Supabase: a `POST .../rest/v1/business_signing_keys` via `urllib.request`, using the
 `service_role` key — the only role `business_signing_keys` (FORCE + zero policies,
 ADR-INV-001 §D3.2) accepts writes from. No `psycopg2`/`supabase-py`/HTTP-framework dependency
 was added for this — flagged here for visibility, not silently decided: if a richer Supabase
 Python client is wanted later, that is a new dependency requiring approval first.
+
+code-quality review (Batch 3, 🔴): the INSERT above wrote no audit_log row at all — a direct
+violation of CLAUDE.md invariant #2. Fixed by calling `public.log_event()`
+(`0016_log_event_and_fixes.sql`) right after a successful INSERT, via `POST
+.../rest/v1/rpc/log_event` with the same service_role key. `log_event()` was extended
+specifically to accept a service_role-authenticated call (no `auth.uid()` to check
+membership against) and record it with `actor_type='service'` — see that migration's header
+comment. A `log_event` failure is logged server-side but does *not* fail this request: the
+signing key itself was already durably written by the time it runs.
 """
 
 from __future__ import annotations

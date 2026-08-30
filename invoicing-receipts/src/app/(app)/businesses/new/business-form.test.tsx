@@ -9,12 +9,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, refresh: refreshMock }),
 }));
 
-const updateMock = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
-const fromMock = vi.fn(() => ({ update: updateMock }));
-vi.mock("@/lib/supabase/browser", () => ({
-  createClient: () => ({ from: fromMock }),
-}));
-
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
@@ -33,8 +27,6 @@ describe("BusinessForm", () => {
     pushMock.mockReset();
     refreshMock.mockReset();
     fetchMock.mockReset();
-    fromMock.mockClear();
-    updateMock.mockClear();
   });
 
   it("shows validation errors and does not call the API when submitted empty", async () => {
@@ -57,7 +49,7 @@ describe("BusinessForm", () => {
     expect(screen.getByText("לא ניתן לשנות את סוג העסק לאחר יצירתו.")).toBeInTheDocument();
   });
 
-  it("creates a business and redirects home on the golden path (no address, no signing-key error)", async () => {
+  it("creates a business and redirects home on the golden path (no signing-key error)", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(
         {
@@ -87,30 +79,6 @@ describe("BusinessForm", () => {
     );
     expect(pushMock).toHaveBeenCalledWith("/");
     expect(refreshMock).toHaveBeenCalledOnce();
-    expect(fromMock).not.toHaveBeenCalled();
-  });
-
-  it("saves address fields via a direct RLS-scoped update after a successful creation", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse(
-        { business: { id: "biz-1", legal_name: "X", tax_id: "123456789" }, signingKeyError: null },
-        true,
-      ),
-    );
-    const user = userEvent.setup();
-    render(<BusinessForm />);
-
-    await fillMinimalValidForm(user);
-    await user.type(screen.getByLabelText("רחוב ומספר (אופציונלי)"), "הרצל 1");
-    await user.type(screen.getByLabelText("עיר (אופציונלי)"), "תל אביב");
-    await user.click(screen.getByRole("button", { name: "יצירת עסק" }));
-
-    await screen.findByText("יצירת עסק", { selector: "button" }).catch(() => {});
-    expect(pushMock).toHaveBeenCalledWith("/");
-    expect(fromMock).toHaveBeenCalledWith("businesses");
-    expect(updateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ address_line1: "הרצל 1", city: "תל אביב" }),
-    );
   });
 
   it("maps an INV_TAX_ID_EXISTS API error to Hebrew and does not navigate", async () => {

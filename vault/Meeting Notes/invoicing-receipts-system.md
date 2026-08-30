@@ -338,3 +338,10 @@
   - לא נגעתי ב-`supabase/migrations/`/`api/` (backend-builder). לא בוצע commit על ידי.
   - אין escalation פתוח לארכיטקט או ל-CEO/מייסד. זהו הסבב האחרון של frontend ב-Phase 0 (F1-F4 כולם DONE) — verification קצה-לקצה מול Supabase חי נשאר ל-שלב הבא, כמתועד ב-Open Questions.
 - **Related:** [[invoicing-phase-0-plan]], [[2026-08-30-invoicing-ui-design-research]], [[001-data-model-and-rls]]
+
+### 2026-08-30 — F3-F4 spec-review fix: removed out-of-scope address fields [done]
+- **What was done:** תיקון ממצא יחיד מ-`vault/Reviews/spec/2026-08-30-invoicing-f3-f4.md` (19/20 פריטים ✅, פריט אחד over-build). הוסרו לגמרי משדות הכתובת (`address_line1`/`city`/`postal_code`) מ-`src/lib/schemas/business.ts`, שדות הטופס והפונקציה `saveAddressDetails` מ-`business-form.tsx` (כולל ה-import של `@/lib/supabase/browser` שהיה משמש רק אותה), והטסטים המתאימים (`business.test.ts`, `business-form.test.tsx`). טופס יצירת עסק חוזר להיות מדויק ל-spec: שם חוקי, entity_type, ח.פ/ע.מ, שם תצוגה אופציונלי (האחרון היה כבר בין ה-19 ✅, לא נגעתי בו).
+- **Decisions:** אין החלטה חדשה — ציות ישיר לממצא ה-review. הכתובת תתווסף ב-Phase 1 דרך הגדרות העסק, בדיוק כפי שהעמוד כבר מציין למשתמש.
+- **Verified (בפועל):** `pnpm typecheck`/`lint`/`test`/`build` — exit 0 (122 טסטים, 24 קבצים). `grep` מאומת: אין עוד `address_line1`/`saveAddressDetails`/`postal_code` בכל `src/`. **תוצר לוואי נמדד:** bundle של `/businesses/new` ירד מ-5.19kB (219kB First Load JS) ל-4.66kB (151kB) — ה-`@/lib/supabase/browser` import שהוסר לא היה נחוץ לטופס בכלל.
+- **Notes / Caveats:** אין escalation. לא נגעתי ב-migrations/api. לא בוצע commit.
+- **Related:** [[invoicing-phase-0-plan]], [[001-data-model-and-rls]]

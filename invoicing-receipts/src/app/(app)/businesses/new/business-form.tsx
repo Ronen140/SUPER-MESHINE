@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { toUserMessage } from "@/lib/errors";
 import { type BusinessInput, businessSchema } from "@/lib/schemas/business";
 import { mapAuthError } from "@/lib/supabase/auth-errors";
-import { createClient } from "@/lib/supabase/browser";
 
 const ENTITY_TYPE_OPTIONS = [
   {
@@ -40,33 +39,6 @@ function extractApiErrorMessage(payload: unknown): string | null {
   return null;
 }
 
-async function saveAddressDetails(businessId: string, values: BusinessInput): Promise<void> {
-  const hasAddress = values.address_line1 || values.city || values.postal_code;
-  if (!hasAddress) return;
-
-  // Not part of public.create_business() (ADR-INV-001 §D10 has no address columns) — a
-  // separate, best-effort write via the RLS-scoped browser client (owner-only
-  // `businesses_update` policy). Failure here must never block the create flow; the
-  // business already exists validly without an address.
-  try {
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("businesses")
-      .update({
-        address_line1: values.address_line1 || null,
-        city: values.city || null,
-        postal_code: values.postal_code || null,
-      })
-      .eq("id", businessId);
-
-    if (error) {
-      console.error("[business-form] failed to save address details:", error);
-    }
-  } catch (err) {
-    console.error("[business-form] failed to save address details:", err);
-  }
-}
-
 export function BusinessForm() {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
@@ -84,9 +56,6 @@ export function BusinessForm() {
       legal_name: "",
       tax_id: "",
       display_name: "",
-      address_line1: "",
-      city: "",
-      postal_code: "",
     },
   });
 
@@ -115,8 +84,6 @@ export function BusinessForm() {
         business: CreatedBusiness;
         signingKeyError: string | null;
       };
-
-      await saveAddressDetails(business.id, values);
 
       if (signingKeyError) {
         setPendingKeyBusiness(business);
@@ -264,26 +231,6 @@ export function BusinessForm() {
         <Label htmlFor="business-display-name">שם תצוגה (אופציונלי)</Label>
         <Input id="business-display-name" type="text" {...register("display_name")} />
       </div>
-
-      <fieldset className="flex flex-col gap-3 border-t border-border pt-4">
-        <legend className="text-sm font-medium">כתובת (אופציונלי)</legend>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="business-address-line1">רחוב ומספר (אופציונלי)</Label>
-          <Input id="business-address-line1" type="text" {...register("address_line1")} />
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="business-city">עיר (אופציונלי)</Label>
-            <Input id="business-city" type="text" {...register("city")} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="business-postal-code">מיקוד (אופציונלי)</Label>
-            <Input id="business-postal-code" type="text" dir="ltr" {...register("postal_code")} />
-          </div>
-        </div>
-      </fieldset>
 
       {formError ? (
         <p role="alert" className="text-sm text-destructive">

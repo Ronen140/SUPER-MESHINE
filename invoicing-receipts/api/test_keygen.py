@@ -138,8 +138,11 @@ def test_create_signing_key_record_certificate_serial_and_fingerprint_are_popula
     assert len(record["fingerprint_sha256"]) == 32  # raw sha256 digest, 32 bytes
 
 
-def test_reads_kek_from_env(monkeypatch):
-    monkeypatch.setenv("SIGNING_MASTER_KEK_V1", TEST_KEK.hex())
+def test_reads_kek_from_env_as_base64(monkeypatch):
+    """ADR-INV-003 §D4: "KEK = base64(32B) ב-Vercel env var" — not hex."""
+    import base64
+
+    monkeypatch.setenv("SIGNING_MASTER_KEK_V1", base64.b64encode(TEST_KEK).decode("ascii"))
     kek, kek_id = kek_from_env()
     assert kek == TEST_KEK
     assert kek_id == "SIGNING_MASTER_KEK_V1"
@@ -147,5 +150,11 @@ def test_reads_kek_from_env(monkeypatch):
 
 def test_kek_from_env_raises_a_clear_error_when_unset(monkeypatch):
     monkeypatch.delenv("SIGNING_MASTER_KEK_V1", raising=False)
+    with pytest.raises(RuntimeError, match="SIGNING_MASTER_KEK_V1"):
+        kek_from_env()
+
+
+def test_kek_from_env_raises_a_clear_error_for_invalid_base64(monkeypatch):
+    monkeypatch.setenv("SIGNING_MASTER_KEK_V1", "not valid base64!!")
     with pytest.raises(RuntimeError, match="SIGNING_MASTER_KEK_V1"):
         kek_from_env()

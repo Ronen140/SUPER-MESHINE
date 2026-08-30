@@ -71,7 +71,7 @@ describe("POST /api/businesses", () => {
     });
   });
 
-  it("propagates a create_business RPC error and never calls keygen", async () => {
+  it("maps a create_business RPC error to its Hebrew user-facing message (never the raw Postgres text) and never calls keygen", async () => {
     rpcMock.mockResolvedValue({
       data: null,
       error: { message: "INV_TAX_ID_EXISTS: a business with this tax_id already exists" },
@@ -81,8 +81,23 @@ describe("POST /api/businesses", () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body.error).toContain("INV_TAX_ID_EXISTS");
+    expect(body.error).toBe("כבר קיים עסק עם מספר עוסק/ח.פ זה במערכת.");
+    expect(body.error).not.toContain("INV_TAX_ID_EXISTS");
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("never leaks a raw, unmapped Postgres error string to the client", async () => {
+    rpcMock.mockResolvedValue({
+      data: null,
+      error: { message: 'duplicate key value violates unique constraint "businesses_tax_id_uk"' },
+    });
+
+    const response = await POST(jsonRequest(VALID_BODY));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).not.toContain("constraint");
+    expect(body.error).not.toContain("businesses_tax_id_uk");
   });
 
   it("on success, calls /api/keygen separately (not unified with create_business) and returns the business", async () => {

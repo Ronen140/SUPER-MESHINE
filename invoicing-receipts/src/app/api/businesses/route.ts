@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { toUserMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -52,7 +53,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    // code-quality review (Batch 3): never forward a raw Postgres error string to the
+    // client (constraint names, internal detail) — only the safe, mapped Hebrew message.
+    return NextResponse.json({ error: toUserMessage(error.message) }, { status: 400 });
   }
 
   const signingKeyError = await requestSigningKey(request, business);

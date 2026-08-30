@@ -9,19 +9,15 @@ import { z } from "zod";
  * check-digit/checksum algorithm is defined anywhere in the schema (ADR-INV-001's
  * `businesses` table only enforces digit count), so none is added here either.
  *
- * Address fields are *not* part of `create_business()` — the RPC has no columns for them.
- * They're collected here as an optional, separate enrichment step: after a successful
- * creation, `business-form.tsx` writes them directly via the RLS-scoped `businesses_update`
- * policy (owner-only), not through this endpoint.
+ * Deliberately does *not* include address fields — out of F3 scope (spec review,
+ * vault/Reviews/spec/2026-08-30-invoicing-f3-f4.md). The page tells the user address
+ * details are added later via business settings (Phase 1).
  */
 export const businessSchema = z.object({
   legal_name: z.string().trim().min(1, "יש להזין שם חוקי לעסק."),
   entity_type: z.enum(["patur", "murshe"], "יש לבחור סוג עסק."),
   tax_id: z.string().regex(/^\d{9}$/, "מספר עוסק/ח.פ חייב להיות בן 9 ספרות."),
   display_name: z.string().trim().min(1).optional().or(z.literal("")),
-  address_line1: z.string().trim().optional().or(z.literal("")),
-  city: z.string().trim().optional().or(z.literal("")),
-  postal_code: z.string().trim().optional().or(z.literal("")),
 });
 
 export type BusinessInput = z.infer<typeof businessSchema>;

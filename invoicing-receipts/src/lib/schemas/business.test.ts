@@ -34,25 +34,8 @@ describe("businessSchema", () => {
     expect(result.error?.issues[0]?.message).toBe("מספר עוסק/ח.פ חייב להיות בן 9 ספרות.");
   });
 
-  it("accepts optional display_name and address fields, including left empty", () => {
-    expect(
-      businessSchema.safeParse({
-        ...VALID,
-        display_name: "",
-        address_line1: "",
-        city: "",
-        postal_code: "",
-      }).success,
-    ).toBe(true);
-
-    expect(
-      businessSchema.safeParse({
-        ...VALID,
-        display_name: "רונן",
-        address_line1: "הרצל 1",
-        city: "תל אביב",
-        postal_code: "6100000",
-      }).success,
-    ).toBe(true);
+  it("accepts an optional display_name, including left empty", () => {
+    expect(businessSchema.safeParse({ ...VALID, display_name: "" }).success).toBe(true);
+    expect(businessSchema.safeParse({ ...VALID, display_name: "רונן" }).success).toBe(true);
   });
 });

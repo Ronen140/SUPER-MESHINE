@@ -6,6 +6,7 @@ error-status mapping, "never leak key material"), not the HTTP transport itself,
 need a real network or a real Supabase project to verify.
 """
 
+import base64
 import json
 from unittest.mock import MagicMock, patch
 
@@ -22,7 +23,8 @@ VALID_PAYLOAD = {
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
-    monkeypatch.setenv("SIGNING_MASTER_KEK_V1", ("ab" * 32))
+    # ADR-INV-003 §D4: "KEK = base64(32B)" — not hex.
+    monkeypatch.setenv("SIGNING_MASTER_KEK_V1", base64.b64encode(b"\xab" * 32).decode("ascii"))
     monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key")
 
@@ -46,11 +48,51 @@ def test_successful_request_inserts_and_returns_only_non_sensitive_metadata(mock
     assert "not_after" in result
     assert "private_key" not in json.dumps(result)
 
-    # exactly one call, to the right endpoint, carrying the service_role key.
-    assert mock_urlopen.call_count == 1
-    sent_request = mock_urlopen.call_args[0][0]
-    assert sent_request.full_url == "https://example.supabase.co/rest/v1/business_signing_keys"
-    assert sent_request.get_header("Authorization") == "Bearer test-service-role-key"
+    # exactly two calls: the INSERT, then the audit log_event RPC.
+    assert mock_urlopen.call_count == 2
+    insert_request = mock_urlopen.call_args_list[0][0][0]
+    assert insert_request.full_url == "https://example.supabase.co/rest/v1/business_signing_keys"
+    assert insert_request.get_header("Authorization") == "Bearer test-service-role-key"
+
+
+@patch("keygen.urllib.request.urlopen")
+def test_successful_request_logs_a_key_create_audit_event_via_log_event(mock_urlopen):
+    """code-quality review (Batch 3, 🔴): business_signing_keys writes were not audited at
+    all — CLAUDE.md invariant #2. Fixed by calling public.log_event() (0016) right after the
+    INSERT, via the same service_role key (PostgREST RPC, not a direct DB connection)."""
+    mock_urlopen.return_value = _mock_response(201)
+
+    generate_and_store_signing_key(VALID_PAYLOAD)
+
+    log_event_request = mock_urlopen.call_args_list[1][0][0]
+    assert log_event_request.full_url == "https://example.supabase.co/rest/v1/rpc/log_event"
+    assert log_event_request.get_header("Authorization") == "Bearer test-service-role-key"
+
+    body = json.loads(log_event_request.data)
+    assert body["p_business_id"] == VALID_PAYLOAD["business_id"]
+    assert body["p_action"] == "key_create"
+    assert body["p_table_name"] == "business_signing_keys"
+    # never the private key / ciphertext — only non-sensitive metadata.
+    assert "private_key" not in json.dumps(body)
+    assert "ciphertext" not in json.dumps(body)
+
+
+@patch("keygen.urllib.request.urlopen")
+def test_a_log_event_failure_does_not_fail_the_overall_keygen_request(mock_urlopen):
+    """The signing key itself was already durably written — a failure auditing that fact is
+    a (loggable server-side) problem, not a reason to report failure for a request that, from
+    the caller's point of view, already succeeded."""
+    import urllib.error
+
+    mock_urlopen.side_effect = [
+        _mock_response(201),  # the business_signing_keys INSERT succeeds
+        urllib.error.URLError("connection refused"),  # the log_event call fails
+    ]
+
+    result = generate_and_store_signing_key(VALID_PAYLOAD)
+
+    assert result["business_id"] == VALID_PAYLOAD["business_id"]
+    assert mock_urlopen.call_count == 2
 
 
 @pytest.mark.parametrize("missing_field", ["business_id", "legal_name", "tax_id"])
