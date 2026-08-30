@@ -367,3 +367,9 @@
 **מה לא השתנה:** B1-B2 (מספור תמיד היה נכון). F1-F4 ללא שינוי. הכרעת גבול frontend Phase0/1 ללא שינוי. Amendment A עצמו (התוכן המהותי של B6/B7/B9/B10/B11/B13) ללא שינוי — רק מספרי הקבצים.
 
 **לקח מצטבר (משתי הטעויות ברצף):** בכל שינוי שנוגע למספור/שמות קבצים בפועל, המקור הראשוני היחיד המהימן הוא הדיסק/git (`ls`, `git show`) — לא תיאור טקסטואלי ב-vault, ולא הנחה מדיספאץ' קודם. מעכשיו: לפני כל revision שנוגעת ל-migration numbering, להריץ `ls supabase/migrations/` ישירות.
+
+## Phase 0 Acceptance Review — 2026-08-30
+
+**Result: ⚠️ ACCEPT-WITH-CONDITIONS.** Full per-subtask table, evidence, and reasoning: [[invoicing-phase-0-acceptance]].
+
+Summary: B1-B8, B10-B13, F1-F2 all ✅ accepted (spec + code-quality-reviewer, plus domain-reviewer on B6-B8). B9 ⚠️ blocked on migration `0017` (audit log on signing-key creation — a confirmed CLAUDE.md invariant #2 gap; first fix rejected by architect, replacement in progress, unreviewed). F3/F4 ⚠️ spec-accepted but never passed code-quality-reviewer at all. B14 (ops jobs) never built — not blocking this sandbox round, but required before connecting to a live Supabase project. Migration numbering diverged further from Revision 3's table as Amendments B/C and Addendum A′ were dispatched directly by the CEO mid-build (final list: `0001`-`0017`, expected and accepted — see acceptance doc for the full as-built map).
