@@ -45,4 +45,17 @@ describe("LogoutButton", () => {
     );
     expect(pushMock).not.toHaveBeenCalled();
   });
+
+  it("shows a Hebrew network error instead of failing silently when signOut throws", async () => {
+    signOutMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    const user = userEvent.setup();
+    render(<LogoutButton />);
+
+    await user.click(screen.getByRole("button", { name: "התנתקות" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "בעיית תקשורת מול השרת. בדקו את החיבור לאינטרנט ונסו שוב.",
+    );
+    expect(pushMock).not.toHaveBeenCalled();
+  });
 });

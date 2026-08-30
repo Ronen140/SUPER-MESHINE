@@ -14,6 +14,7 @@ import { type SignupInput, signupSchema } from "./signup-form.schema";
 export function SignupForm() {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
+  const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -26,21 +27,48 @@ export function SignupForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email: values.email,
-      password: values.password,
-      options: { data: { full_name: values.fullName } },
-    });
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: { data: { full_name: values.fullName } },
+      });
 
-    if (error) {
-      setFormError(mapAuthError(error));
-      return;
+      if (error) {
+        setFormError(mapAuthError(error));
+        return;
+      }
+
+      if (!data?.session) {
+        // Supabase's "Confirm email" project setting (default ON for new
+        // projects) returns error: null but no session until the user clicks
+        // the confirmation link — navigating to "/" here would bounce straight
+        // back to /login via middleware with no explanation (code-quality
+        // review, Issue #2).
+        setConfirmationMessage(
+          "נשלח אליכם מייל לאימות החשבון. יש ללחוץ על הקישור במייל כדי להתחבר.",
+        );
+        return;
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      // createClient() throws synchronously on missing env; signUp()'s own
+      // promise can also reject on a raw network failure — surface both
+      // instead of failing silently (code-quality review, Issue #1).
+      setFormError(mapAuthError(err));
     }
-
-    router.push("/");
-    router.refresh();
   });
+
+  if (confirmationMessage) {
+    return (
+      <p role="status" className="rounded-md bg-success/10 p-4 text-sm text-success">
+        {confirmationMessage}
+      </p>
+    );
+  }
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">

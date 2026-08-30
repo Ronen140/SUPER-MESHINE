@@ -63,4 +63,19 @@ describe("LoginForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("אימייל או סיסמה שגויים.");
     expect(pushMock).not.toHaveBeenCalled();
   });
+
+  it("shows a Hebrew network error instead of failing silently when signInWithPassword throws", async () => {
+    signInWithPasswordMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    const user = userEvent.setup();
+    render(<LoginForm redirectTo="/" />);
+
+    await user.type(screen.getByLabelText("אימייל"), "ronen@example.com");
+    await user.type(screen.getByLabelText("סיסמה"), "s3cret!");
+    await user.click(screen.getByRole("button", { name: "התחברות" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "בעיית תקשורת מול השרת. בדקו את החיבור לאינטרנט ונסו שוב.",
+    );
+    expect(pushMock).not.toHaveBeenCalled();
+  });
 });

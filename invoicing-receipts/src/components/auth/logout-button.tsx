@@ -15,17 +15,25 @@ export function LogoutButton() {
   async function handleLogout() {
     setIsPending(true);
     setError(null);
-    const supabase = createClient();
-    const { error: signOutError } = await supabase.auth.signOut();
-    setIsPending(false);
+    try {
+      const supabase = createClient();
+      const { error: signOutError } = await supabase.auth.signOut();
 
-    if (signOutError) {
-      setError(mapAuthError(signOutError));
-      return;
+      if (signOutError) {
+        setError(mapAuthError(signOutError));
+        return;
+      }
+
+      router.push("/login");
+      router.refresh();
+    } catch (err) {
+      // createClient() throws synchronously on missing env; signOut()'s own
+      // promise can also reject on a raw network failure — surface both
+      // instead of failing silently (code-quality review, Issue #1).
+      setError(mapAuthError(err));
+    } finally {
+      setIsPending(false);
     }
-
-    router.push("/login");
-    router.refresh();
   }
 
   return (

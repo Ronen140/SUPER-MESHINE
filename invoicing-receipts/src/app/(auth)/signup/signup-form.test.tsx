@@ -47,8 +47,8 @@ describe("SignupForm", () => {
     expect(signUpMock).not.toHaveBeenCalled();
   });
 
-  it("submits valid data with full_name metadata and redirects to / on success", async () => {
-    signUpMock.mockResolvedValue({ error: null });
+  it("submits valid data with full_name metadata and redirects to / when a session comes back", async () => {
+    signUpMock.mockResolvedValue({ data: { session: { access_token: "token" } }, error: null });
     const user = userEvent.setup();
     render(<SignupForm />);
 
@@ -65,6 +65,42 @@ describe("SignupForm", () => {
     });
     expect(pushMock).toHaveBeenCalledWith("/");
     expect(refreshMock).toHaveBeenCalledOnce();
+  });
+
+  it("shows an email-confirmation message instead of navigating when signUp succeeds without a session", async () => {
+    // Supabase's "Confirm email" setting (default ON for new projects) returns
+    // error: null but data.session === null until the user clicks the email link.
+    signUpMock.mockResolvedValue({ data: { session: null }, error: null });
+    const user = userEvent.setup();
+    render(<SignupForm />);
+
+    await user.type(screen.getByLabelText("שם מלא"), "רונן דורמן");
+    await user.type(screen.getByLabelText("אימייל"), "ronen@example.com");
+    await user.type(screen.getByLabelText("סיסמה"), "s3cret!");
+    await user.type(screen.getByLabelText("אימות סיסמה"), "s3cret!");
+    await user.click(screen.getByRole("button", { name: "יצירת חשבון" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "נשלח אליכם מייל לאימות החשבון. יש ללחוץ על הקישור במייל כדי להתחבר.",
+    );
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("shows a Hebrew network error instead of failing silently when signUp throws", async () => {
+    signUpMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    const user = userEvent.setup();
+    render(<SignupForm />);
+
+    await user.type(screen.getByLabelText("שם מלא"), "רונן דורמן");
+    await user.type(screen.getByLabelText("אימייל"), "ronen@example.com");
+    await user.type(screen.getByLabelText("סיסמה"), "s3cret!");
+    await user.type(screen.getByLabelText("אימות סיסמה"), "s3cret!");
+    await user.click(screen.getByRole("button", { name: "יצירת חשבון" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "בעיית תקשורת מול השרת. בדקו את החיבור לאינטרנט ונסו שוב.",
+    );
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it("shows a Hebrew error when Supabase rejects a duplicate signup", async () => {

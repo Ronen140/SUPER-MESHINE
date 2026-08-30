@@ -19,6 +19,9 @@ export async function updateSession(
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
+    console.error(
+      "[middleware] Supabase env vars missing (NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY) — failing open to unauthenticated.",
+    );
     return { response, user: null };
   }
 
@@ -43,9 +46,10 @@ export async function updateSession(
       data: { user },
     } = await supabase.auth.getUser();
     return { response, user };
-  } catch {
+  } catch (error) {
     // Network/DNS failure reaching an unconfigured or unreachable Supabase
     // project — treat as unauthenticated rather than 500ing every request.
+    console.error("[middleware] Failed to reach Supabase while refreshing session:", error);
     return { response, user: null };
   }
 }

@@ -26,16 +26,24 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword(values);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword(values);
 
-    if (error) {
-      setFormError(mapAuthError(error));
-      return;
+      if (error) {
+        setFormError(mapAuthError(error));
+        return;
+      }
+
+      router.push(redirectTo);
+      router.refresh();
+    } catch (err) {
+      // createClient() throws synchronously on missing env; signInWithPassword's
+      // own promise can also reject (not just resolve with {error}) on a raw
+      // network failure — surface both instead of failing silently (code-quality
+      // review, vault/Reviews/quality/2026-08-30-invoicing-f1-f2.md, Issue #1).
+      setFormError(mapAuthError(err));
     }
-
-    router.push(redirectTo);
-    router.refresh();
   });
 
   return (
